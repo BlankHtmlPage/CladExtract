@@ -16,8 +16,8 @@ use std::ffi::OsString;
 
 static UPDATE_FILE: LazyLock<Mutex<Option<PathBuf>>> = LazyLock::new(|| Mutex::new(None));
 
-static URL: &str = "https://api.github.com/repos/AeEn123/RoExtract/releases/latest";
-static PRERELEASE_URL: &str = "https://api.github.com/repos/AeEn123/RoExtract/releases";
+static URL: &str = "https://api.github.com/repos/BlankHtmlPage/CladExtract/releases/latest";
+static PRERELEASE_URL: &str = "https://api.github.com/repos/BlankHtmlPage/CladExtract/releases";
 
 #[derive(Deserialize, Debug, Clone)]
 struct Asset {
@@ -134,7 +134,7 @@ pub fn download_update(url: &str, tag_name: Option<&str>) {
 
     let response = client
         .get(url)
-        .header("User-Agent", "RoExtract (Rust)") // Set a User-Agent otherwise it returns 403
+        .header("User-Agent", "CladExtract (Rust)") // Set a User-Agent otherwise it returns 403
         .send();
 
     match response {
@@ -238,12 +238,12 @@ pub fn check_for_updates(run_gui: bool, auto_download_update: bool) {
     let response = if include_prerelease {
         client
             .get(PRERELEASE_URL)
-            .header("User-Agent", "RoExtract (Rust)")
+            .header("User-Agent", "CladExtract (Rust)")
             .send()
     } else {
         client
             .get(URL)
-            .header("User-Agent", "RoExtract (Rust)") // Set a User-Agent otherwise it returns 403
+            .header("User-Agent", "CladExtract (Rust)") // Set a User-Agent otherwise it returns 403
             .send()
     };
 

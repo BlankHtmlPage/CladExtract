@@ -384,11 +384,19 @@ pub fn rbx_storage_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<F
             .unwrap_or_else(|| locale::get_message(locale, "no-directory", None)),
     );
 
-    ui.label(locale::get_message(locale, "rbx-storage-directory", Some(&args)));
+    ui.label(locale::get_message(
+        locale,
+        "rbx-storage-directory",
+        Some(&args),
+    ));
 
     ui.horizontal(|ui| {
         if ui
-            .button(locale::get_message(locale, "button-change-rbx-storage-dir", None))
+            .button(locale::get_message(
+                locale,
+                "button-change-rbx-storage-dir",
+                None,
+            ))
             .clicked()
         {
             let option_path = DialogBuilder::file().open_single_dir().show().unwrap();
@@ -420,7 +428,11 @@ pub fn rbx_storage_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<F
             }
         }
         if ui
-            .button(locale::get_message(locale, "button-reset-rbx-storage-dir", None))
+            .button(locale::get_message(
+                locale,
+                "button-reset-rbx-storage-dir",
+                None,
+            ))
             .clicked()
         {
             config::remove_config_value("rbx_storage_directory");

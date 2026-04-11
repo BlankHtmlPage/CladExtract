@@ -20,29 +20,30 @@ mod welcome;
 const VERSION: &str = env!("CARGO_PKG_VERSION"); // Get version for use in the title bar
 const COMPILE_DATE: &str = env!("COMPILE_DATE");
 const ICON: &[u8; 11400] = include_bytes!("../assets/icon.png");
-const CONTRIBUTORS: [&str; 6] = [
-    "AeEn123",
-    "Vonercent",
-    "MarcelDev",
-    "JustKanade",
-    "IDDQD1337",
-    "yuk1n0w",
+const CONTRIBUTORS: [[&str; 2]; 7] = [
+    ["BlankHtmlPage", "CladExtract development"],
+    ["AeEn123", "Original RoExtract author"],
+    ["Vonercent", "RoExtract contributor"],
+    ["MarcelDev", "RoExtract contributor"],
+    ["JustKanade", "RoExtract contributor"],
+    ["IDDQD1337", "RoExtract contributor"],
+    ["yuk1n0w", "RoExtract contributor"],
 ];
-const DEPENDENCIES: [[&str; 2]; 14] = [
-    ["https://github.com/emilk/egui", ""],
-    ["https://github.com/Adanos020/egui_dock", ""],
-    ["https://github.com/lampsitter/egui_commonmark", ""],
-    ["https://github.com/native-dialog-rs/native-dialog-rs", ""],
-    ["https://github.com/projectfluent/fluent-rs", ""],
-    ["https://github.com/1Password/sys-locale", ""],
-    ["https://github.com/zbraniecki/unic-locale", ""],
-    ["https://github.com/clap-rs/clap", ""],
-    ["https://github.com/ardaku/whoami", ""],
-    ["https://github.com/seanmonstar/reqwest", ""],
-    ["https://github.com/serde-rs/json", ""],
-    ["https://github.com/Peternator7/strum", ""],
-    ["https://github.com/chronotope/chrono", ""],
-    ["https://github.com/image-rs/image", ""],
+const DEPENDENCIES: [&str; 14] = [
+    "https://github.com/emilk/egui",
+    "https://github.com/Adanos020/egui_dock",
+    "https://github.com/lampsitter/egui_commonmark",
+    "https://github.com/native-dialog-rs/native-dialog-rs",
+    "https://github.com/projectfluent/fluent-rs",
+    "https://github.com/1Password/sys-locale",
+    "https://github.com/zbraniecki/unic-locale",
+    "https://github.com/clap-rs/clap",
+    "https://github.com/ardaku/whoami",
+    "https://github.com/seanmonstar/reqwest",
+    "https://github.com/serde-rs/json",
+    "https://github.com/Peternator7/strum",
+    "https://github.com/chronotope/chrono",
+    "https://github.com/image-rs/image",
 ];
 
 pub static IMAGES: LazyLock<Mutex<HashMap<String, TextureHandle>>> =
@@ -76,24 +77,6 @@ pub fn load_image(
         let mut images = IMAGES.lock().unwrap();
         images.insert(id.to_string(), texture.clone());
         Ok(texture)
-    }
-}
-
-fn add_dependency_credit(dependency: [&str; 2], ui: &mut egui::Ui, sponsor_message: &str) {
-    if !dependency[1].is_empty() {
-        ui.horizontal(|ui| {
-            ui.hyperlink_to(
-                dependency[0].replace("https://github.com/", ""),
-                dependency[0],
-            );
-            ui.label("|");
-            ui.hyperlink_to(sponsor_message, dependency[1]);
-        });
-    } else {
-        ui.hyperlink_to(
-            dependency[0].replace("https://github.com/", ""),
-            dependency[0],
-        );
     }
 }
 
@@ -187,57 +170,35 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                     ui.add(egui::Image::new(&texture).fit_to_exact_size(egui::vec2(40.0, 40.0)));
                 }
                 ui.vertical(|ui| {
-                    ui.heading("RoExtract");
+                    ui.heading("CladExtract");
 
                     let mut args = fluent_bundle::FluentArgs::new();
                     args.set("version", VERSION);
                     args.set("date", COMPILE_DATE);
 
-                    ui.horizontal(|ui| {
-                        ui.label(locale::get_message(self.locale, "version", Some(&args)));
-                        ui.label("|");
-                        ui.hyperlink_to("Discord", "https://discord.gg/xqNA5jt6DN");
-                    });
+                    ui.label(locale::get_message(self.locale, "version", Some(&args)));
                 })
-            });
-
-            ui.separator();
-
-            ui.heading(locale::get_message(
-                self.locale,
-                "support-project-donate",
-                None,
-            ));
-
-            ui.horizontal(|ui| {
-                ui.hyperlink_to(
-                    locale::get_message(self.locale, "support-sponsor", None),
-                    "https://github.com/sponsors/AeEn123",
-                );
-                ui.label("|");
-                ui.hyperlink_to(
-                    "Roblox",
-                    "https://www.roblox.com/communities/10808976/Alfie-Likes-Computers#!/store",
-                )
             });
 
             ui.separator();
 
             ui.heading(locale::get_message(self.locale, "contributors", None));
             for contributor in CONTRIBUTORS {
-                ui.hyperlink_to(
-                    format!("@{contributor}"),
-                    format!("https://github.com/{contributor}"),
-                );
+                ui.horizontal(|ui| {
+                    ui.hyperlink_to(
+                        format!("@{}", contributor[0]),
+                        format!("https://github.com/{}", contributor[0]),
+                    );
+                    ui.label(format!("— {}", contributor[1]));
+                });
             }
 
             ui.separator();
 
             ui.heading(locale::get_message(self.locale, "dependencies", None));
 
-            let sponsor_message = locale::get_message(self.locale, "support-sponsor", None);
             for dependency in DEPENDENCIES {
-                add_dependency_credit(dependency, ui, &sponsor_message);
+                ui.hyperlink_to(dependency.replace("https://github.com/", ""), dependency);
             }
         }
     }
@@ -434,7 +395,7 @@ pub fn run_gui() {
         };
 
         let result = eframe::run_native(
-            &format!("RoExtract v{VERSION}").to_owned(),
+            &format!("CladExtract v{VERSION}").to_owned(),
             options,
             Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
         );

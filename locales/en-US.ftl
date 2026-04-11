@@ -38,9 +38,6 @@ button-disable-display-image-preview = Hide Image Previews
 input-preview-size = Preview Size
 
 # Confirmations
-confirmation-generic-confirmation-title = Confirmation
-confirmation-delete-confirmation-title = Delete Files
-confirmation-delete-confirmation-description = Are you sure you want to delete all files in this directory?
 confirmation-filter-confirmation-title = Filtering in Progress
 confirmation-filter-confirmation-description = Are you sure you want to extract files while filtering is still running? This may result in an incomplete extraction.
 confirmation-clear-cache-title = Clear Cache
@@ -58,8 +55,6 @@ error-directory-detection-title = Directory Detection Failed
 error-directory-detection-description = Failed to detect the target directory. Ensure the client is installed and has been run at least once.
 error-sql-detection-title = Database Detection Failed
 error-sql-detection-description = Failed to detect the SQLite database. Ensure the client is installed and has been run at least once.
-error-temporary-directory-title = Failed to Create Temporary Directory
-error-temporary-directory-description = Failed to create a temporary directory. Verify that you have read/write permissions for your system's temp folder. If the issue persists, try running the application as an administrator.
 error-invalid-directory-title = Invalid Directory
 error-invalid-directory-description = The provided path is not a valid directory. Please verify the path and try again.
 error-invalid-database-title = Invalid Database
@@ -100,23 +95,18 @@ overwrite-with = Double-click a file to overwrite "{ $asset }"
 # Statuses
 idling = Idling
 deleting-files = Deleting files ({ $item }/{ $total })
-reading-files = Reading files ({ $item }/{ $total })
 extracting-files = Extracting files ({ $item }/{ $total })
 filtering-files = Filtering files ({ $item }/{ $total })
 all-extracted = Extraction Complete
-stage = Stage { $stage }/{ $max }: { $status }
 swapped = Swapped "{ $item_a }" with "{ $item_b }"
 copied = Overwrote "{ $item_b }" with "{ $item_a }"
 
 # Error Statuses
 failed-deleting-file = Failed to delete file ({ $item }/{ $total })
 failed-opening-file = Failed to open file
-failed-not-file = "{ $file }" is not a valid file
-error-extracting-file = Failed to extract file: { $error }
 error-check-logs = Check logs for additional details.
 
 # Misc
-no-function = (Not yet implemented)
 version = Version: v{ $version } (compiled at { $date })
 cache-directory = Cache Directory: { $directory }
 sql-database = SQL Database: { $path }

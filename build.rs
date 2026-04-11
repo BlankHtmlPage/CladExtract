@@ -1,10 +1,11 @@
-use {
-    std::{env, fs, io, path::Path},
-    winresource::WindowsResource,
-};
+use std::{env, fs, io, path::Path};
+
+#[cfg(windows)]
+use winresource::WindowsResource;
 
 fn main() -> io::Result<()> {
     // Apply file info on windows
+    #[cfg(windows)]
     if env::var_os("CARGO_CFG_WINDOWS").is_some() {
         let mut res = WindowsResource::new();
 

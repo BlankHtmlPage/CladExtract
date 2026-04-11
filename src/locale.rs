@@ -16,7 +16,7 @@ fn init_language_list() -> Vec<(String, String)> {
     let mut languages = LOCALES.to_vec();
 
     // Move the default language to the top of the language list
-    let default_language = &sys_locale::get_locale().unwrap_or_else(|| "en-GB".to_string());
+    let default_language = &sys_locale::get_locale().unwrap_or_else(|| "en-US".to_string());
     if let Some(pos) = languages.iter().position(|lang| lang == default_language) {
         let default_lang = languages.remove(pos);
         languages.insert(0, default_lang);
@@ -62,19 +62,19 @@ pub fn get_locale(lang: Option<&str>) -> FluentBundle<Arc<FluentResource>> {
             &language.clone()
         } else {
             // The language is not in the config file.
-            &sys_locale::get_locale().unwrap_or_else(|| "en-GB".to_string()) // If locale cannot be identified, default to English
+            &sys_locale::get_locale().unwrap_or_else(|| "en-US".to_string()) // If locale cannot be identified, default to English
         }
     };
 
     let resource_data = if let Some(resources) = get_locale_resources(locale) {
         resources
     } else {
-        get_locale_resources("en-GB").unwrap() // Use English if the locale is not supported
+        get_locale_resources("en-US").unwrap() // Use English if the locale is not supported
     };
 
     let resource = FluentResource::try_new(resource_data).expect("Failed to parse FTL string.");
 
-    let lang_id: LanguageIdentifier = locale.parse().unwrap_or_else(|_| "en-GB".parse().unwrap());
+    let lang_id: LanguageIdentifier = locale.parse().unwrap_or_else(|_| "en-US".parse().unwrap());
     let mut bundle = FluentBundle::new(vec![lang_id]);
 
     bundle.add_resource_overriding(resource.into());

@@ -81,7 +81,7 @@ impl eframe::App for App {
 
 pub fn run_gui(json: updater::Release, url: String) -> eframe::Result {
     eframe::run_native(
-        &format!("RoExtract Updater v{VERSION}"),
+        &format!("CladExtract Updater v{VERSION}"),
         eframe::NativeOptions::default(),
         Box::new(move |cc| {
             cc.egui_ctx.style_mut(|style| {

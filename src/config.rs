@@ -8,8 +8,8 @@ static CONFIG: LazyLock<Mutex<Value>> = LazyLock::new(|| Mutex::new(read_config_
 static SYSTEM_CONFIG: LazyLock<Mutex<Value>> = LazyLock::new(|| Mutex::new(read_system_config()));
 static CONFIG_FILE: LazyLock<Mutex<PathBuf>> = LazyLock::new(|| Mutex::new(detect_config_file()));
 
-const SYSTEM_CONFIG_FILE: &str = "RoExtract-system.json";
-const DEFAULT_CONFIG_FILE: &str = "RoExtract-config.json";
+const SYSTEM_CONFIG_FILE: &str = "CladExtract-system.json";
+const DEFAULT_CONFIG_FILE: &str = "CladExtract-config.json";
 
 // Define local functions
 fn detect_config_file() -> PathBuf {

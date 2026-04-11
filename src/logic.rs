@@ -8,9 +8,7 @@ use std::{
 
 use clap::ValueEnum;
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
-
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
+use strum::{Display, EnumIter, IntoEnumIterator};
 
 use crate::{config, locale};
 
@@ -184,7 +182,7 @@ fn read_asset(asset: &AssetInfo) -> Result<Vec<u8>, std::io::Error> {
 pub fn create_temp_dir() -> PathBuf {
     let path = match config::get_system_config_string("temp-directory") {
         Some(dir) => PathBuf::from(dir),
-        None => env::temp_dir().join("RoExtract"),
+        None => env::temp_dir().join("CladExtract"),
     };
 
     match fs::create_dir(&path) {
