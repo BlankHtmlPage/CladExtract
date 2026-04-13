@@ -1,6 +1,7 @@
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
 use rusqlite::params;
 use rusqlite::Connection;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     fs,
     sync::{Arc, LazyLock, Mutex},
@@ -8,6 +9,8 @@ use std::{
 };
 
 use crate::{config, locale, logic};
+
+static DATABASE_PROMPTED: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(false));
 
 const DEFAULT_PATHS: [&str; 2] = [
     "%localappdata%\\Roblox\\rbx-storage.db",
@@ -47,53 +50,55 @@ pub fn open_database() -> Option<Connection> {
     }
 
     // If it was unable to detect any path, tell the user
-    let _ = native_dialog::DialogBuilder::message()
-        .set_level(native_dialog::MessageLevel::Error)
-        .set_title(locale::get_message(
-            &locale::get_locale(None),
-            "error-sql-detection-title",
-            None,
-        ))
-        .set_text(locale::get_message(
-            &locale::get_locale(None),
-            "error-sql-detection-description",
-            None,
-        ))
-        .alert()
-        .show();
+    if !DATABASE_PROMPTED.swap(true, Ordering::SeqCst) {
+        let _ = native_dialog::DialogBuilder::message()
+            .set_level(native_dialog::MessageLevel::Error)
+            .set_title(locale::get_message(
+                &locale::get_locale(None),
+                "error-sql-detection-title",
+                None,
+            ))
+            .set_text(locale::get_message(
+                &locale::get_locale(None),
+                "error-sql-detection-description",
+                None,
+            ))
+            .alert()
+            .show();
 
-    let yes = native_dialog::DialogBuilder::message()
-        .set_level(native_dialog::MessageLevel::Error)
-        .set_title(locale::get_message(
-            &locale::get_locale(None),
-            "confirmation-custom-sql-title",
-            None,
-        ))
-        .set_text(locale::get_message(
-            &locale::get_locale(None),
-            "confirmation-custom-sql-description",
-            None,
-        ))
-        .confirm()
-        .show()
-        .unwrap();
-
-    if yes {
-        let option_path = native_dialog::DialogBuilder::file()
-            .open_single_dir()
+        let yes = native_dialog::DialogBuilder::message()
+            .set_level(native_dialog::MessageLevel::Error)
+            .set_title(locale::get_message(
+                &locale::get_locale(None),
+                "confirmation-custom-sql-title",
+                None,
+            ))
+            .set_text(locale::get_message(
+                &locale::get_locale(None),
+                "confirmation-custom-sql-description",
+                None,
+            ))
+            .confirm()
             .show()
             .unwrap();
-        if let Some(path) = option_path {
-            config::set_config_value(
-                "sql_database",
-                logic::resolve_path(path.to_string_lossy().as_ref()).into(),
-            );
-            return open_database();
+
+        if yes {
+            let option_path = native_dialog::DialogBuilder::file()
+                .open_single_dir()
+                .show()
+                .unwrap();
+            if let Some(path) = option_path {
+                config::set_config_value(
+                    "sql_database",
+                    logic::resolve_path(path.to_string_lossy().as_ref()).into(),
+                );
+                return open_database();
+            } else {
+                log_critical!("Database detection failed! {}", errors);
+            }
         } else {
             log_critical!("Database detection failed! {}", errors);
         }
-    } else {
-        log_critical!("Database detection failed! {}", errors);
     }
 
     None

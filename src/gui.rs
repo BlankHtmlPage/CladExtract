@@ -21,7 +21,10 @@ const VERSION: &str = env!("CARGO_PKG_VERSION"); // Get version for use in the t
 const COMPILE_DATE: &str = env!("COMPILE_DATE");
 const ICON: &[u8; 11400] = include_bytes!("../assets/icon.png");
 const CONTRIBUTORS: [[&str; 2]; 7] = [
-    ["BlankHtmlPage", "CladExtract development"],
+    [
+        "BlankHtmlPage",
+        "CladExtract developer & RoExtract contributor",
+    ],
     ["AeEn123", "Original RoExtract author"],
     ["Vonercent", "RoExtract contributor"],
     ["MarcelDev", "RoExtract contributor"],

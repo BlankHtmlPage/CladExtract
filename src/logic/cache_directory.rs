@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{fs, path::PathBuf, sync::Mutex};
 
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};
@@ -7,6 +8,8 @@ use std::sync::{Arc, LazyLock};
 use crate::config;
 use crate::locale;
 use crate::logic::{self, determine_category};
+
+static DIRECTORY_PROMPTED: LazyLock<AtomicBool> = LazyLock::new(|| AtomicBool::new(false));
 
 const DEFAULT_DIRECTORIES: [&str; 2] = [
     "%Temp%\\Roblox",
@@ -91,55 +94,57 @@ pub fn detect_directory() -> PathBuf {
     }
 
     // If it was unable to detect any directory, tell the user
-    let _ = native_dialog::DialogBuilder::message()
-        .set_level(native_dialog::MessageLevel::Error)
-        .set_title(locale::get_message(
-            &locale::get_locale(None),
-            "error-directory-detection-title",
-            None,
-        ))
-        .set_text(locale::get_message(
-            &locale::get_locale(None),
-            "error-directory-detection-description",
-            None,
-        ))
-        .alert()
-        .show();
+    if !DIRECTORY_PROMPTED.swap(true, Ordering::SeqCst) {
+        let _ = native_dialog::DialogBuilder::message()
+            .set_level(native_dialog::MessageLevel::Error)
+            .set_title(locale::get_message(
+                &locale::get_locale(None),
+                "error-directory-detection-title",
+                None,
+            ))
+            .set_text(locale::get_message(
+                &locale::get_locale(None),
+                "error-directory-detection-description",
+                None,
+            ))
+            .alert()
+            .show();
 
-    let yes = native_dialog::DialogBuilder::message()
-        .set_level(native_dialog::MessageLevel::Error)
-        .set_title(locale::get_message(
-            &locale::get_locale(None),
-            "confirmation-custom-directory-title",
-            None,
-        ))
-        .set_text(locale::get_message(
-            &locale::get_locale(None),
-            "confirmation-custom-directory-description",
-            None,
-        ))
-        .confirm()
-        .show()
-        .unwrap();
-
-    if yes {
-        let option_path = native_dialog::DialogBuilder::file()
-            .open_single_dir()
+        let yes = native_dialog::DialogBuilder::message()
+            .set_level(native_dialog::MessageLevel::Error)
+            .set_title(locale::get_message(
+                &locale::get_locale(None),
+                "confirmation-custom-directory-title",
+                None,
+            ))
+            .set_text(locale::get_message(
+                &locale::get_locale(None),
+                "confirmation-custom-directory-description",
+                None,
+            ))
+            .confirm()
             .show()
             .unwrap();
-        if let Some(path) = option_path {
-            config::set_config_value(
-                "cache_directory",
-                validate_directory(path.to_string_lossy().as_ref())
-                    .unwrap()
-                    .into(),
-            );
-            return detect_directory();
+
+        if yes {
+            let option_path = native_dialog::DialogBuilder::file()
+                .open_single_dir()
+                .show()
+                .unwrap();
+            if let Some(path) = option_path {
+                config::set_config_value(
+                    "cache_directory",
+                    validate_directory(path.to_string_lossy().as_ref())
+                        .unwrap()
+                        .into(),
+                );
+                return detect_directory();
+            } else {
+                log_critical!("Directory detection failed! {}", errors);
+            }
         } else {
             log_critical!("Directory detection failed! {}", errors);
         }
-    } else {
-        log_critical!("Directory detection failed! {}", errors);
     }
     PathBuf::new()
 }
