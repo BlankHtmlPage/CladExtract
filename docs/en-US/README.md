@@ -4,7 +4,7 @@
 
 ## AI-Maintained Project
 
-CladExtract is **100% maintained by artificial intelligence** (currently [Qwen 3.6 Plus](https://qwenlm.github.io/blog/qwen3.6/)). All development, bug fixes, feature additions, and refactoring are performed by an AI assistant. This project serves as both a practical tool and an experiment in autonomous software maintenance.
+CladExtract is **100% maintained by artificial intelligence** (currently Qwen 3.6 Plus). All development, bug fixes, feature additions, and refactoring are performed by an AI assistant. This project serves as both a practical tool and an experiment in autonomous software maintenance.
 
 ## About
 
