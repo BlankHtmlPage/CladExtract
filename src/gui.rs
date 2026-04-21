@@ -332,9 +332,102 @@ impl MyApp {
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Toast notifications
+        let toasts = logic::get_toasts();
+        if !toasts.is_empty() {
+            let screen_rect = ctx.screen_rect();
+            let mut y_offset = 10.0;
+            for toast in &toasts {
+                let (kind_label, color) = match &toast.kind {
+                    logic::ToastKind::Error => (
+                        locale::get_message(&self.locale, "toast-error", None),
+                        egui::Color32::from_rgb(180, 50, 50),
+                    ),
+                    logic::ToastKind::Warning => (
+                        locale::get_message(&self.locale, "toast-warning", None),
+                        egui::Color32::from_rgb(180, 150, 30),
+                    ),
+                    logic::ToastKind::Success => (
+                        locale::get_message(&self.locale, "toast-success", None),
+                        egui::Color32::from_rgb(40, 140, 60),
+                    ),
+                    logic::ToastKind::Info => (
+                        String::new(),
+                        ctx.style().visuals.widgets.noninteractive.bg_fill,
+                    ),
+                };
+
+                let label = if kind_label.is_empty() {
+                    toast.message.clone()
+                } else {
+                    format!("{}: {}", kind_label, toast.message)
+                };
+
+                let frame = egui::Frame::new()
+                    .fill(color)
+                    .corner_radius(4.0)
+                    .inner_margin(egui::vec2(10.0, 6.0));
+
+                let toast_width = 300.0;
+                let pos = egui::pos2(
+                    screen_rect.right() - toast_width - 10.0,
+                    screen_rect.min.y + y_offset,
+                );
+
+                ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, "toasts".into()))
+                    .rect_filled(
+                        egui::Rect::from_min_size(pos, egui::vec2(toast_width, 30.0)),
+                        4.0,
+                        color,
+                    );
+
+                ctx.layer_painter(egui::LayerId::new(
+                    egui::Order::Foreground,
+                    "toasts_text".into(),
+                ))
+                .text(
+                    pos + egui::vec2(8.0, 6.0),
+                    egui::Align2::LEFT_TOP,
+                    label,
+                    egui::TextStyle::Small.resolve(ctx.style().as_ref()),
+                    egui::Color32::WHITE,
+                );
+
+                y_offset += 36.0;
+            }
+        }
+
         // Display the status bar at the bottom
         egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
             ui.add(egui::ProgressBar::new(logic::get_progress()).text(logic::get_status()));
+
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(&locale::get_message(
+                        &self.locale,
+                        "shortcuts-label",
+                        None,
+                    ))
+                    .strong()
+                    .size(10.0),
+                );
+                ui.label(
+                    egui::RichText::new(&format!(
+                        "{}  {}  {}  {}  {}  {}  {}  {}",
+                        locale::get_message(&self.locale, "shortcut-refresh", None),
+                        locale::get_message(&self.locale, "shortcut-rename", None),
+                        locale::get_message(&self.locale, "shortcut-search", None),
+                        locale::get_message(&self.locale, "shortcut-extract", None),
+                        locale::get_message(&self.locale, "shortcut-swap", None),
+                        locale::get_message(&self.locale, "shortcut-copy", None),
+                        locale::get_message(&self.locale, "shortcut-cancel", None),
+                        locale::get_message(&self.locale, "shortcut-delete", None),
+                    ))
+                    .size(10.0)
+                    .color(ui.visuals().weak_text_color()),
+                );
+            });
         });
 
         // Switch tabs with keyboard input (num keys)

@@ -544,6 +544,51 @@ impl FileListUi {
 
         let mut focus_search_box = false; // Focus the search box toggle for this frame
 
+        // Apply current sort to the file list
+        let mut file_list = if self.searching {
+            let old_search_query = self.search_query.clone();
+
+            let response = ui.text_edit_singleline(&mut self.search_query);
+
+            if focus_search_box {
+                response.request_focus();
+            }
+
+            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                self.searching = false; // Remove the search bar when the use presses escape
+            }
+
+            if self.search_query != old_search_query {
+                logic::filter_file_list(self.search_query.clone());
+            }
+            let mut list = logic::get_filtered_file_list();
+            logic::apply_sort(&mut list);
+            list
+        } else {
+            let mut list = file_list;
+            logic::apply_sort(&mut list);
+            list
+        };
+
+        // Empty state
+        if file_list.is_empty() {
+            ui.vertical_centered(|ui| {
+                ui.add_space(40.0);
+                let icon_size = 48.0;
+                ui.add(
+                    egui::Label::new(egui::RichText::new("📂").size(icon_size)).selectable(false),
+                );
+                ui.heading(locale::get_message(&self.locale, "empty-state-title", None));
+                ui.label(locale::get_message(
+                    &self.locale,
+                    "empty-state-description",
+                    None,
+                ));
+                ui.label(locale::get_message(&self.locale, "empty-state-hint", None));
+            });
+            return;
+        }
+
         // Handle key shortcuts here
         if ui.input(|i| i.key_pressed(egui::Key::F2)) {
             // Rename hotkey
@@ -692,27 +737,6 @@ impl FileListUi {
             }
         }
 
-        let file_list = if self.searching {
-            let old_search_query = self.search_query.clone();
-
-            let response = ui.text_edit_singleline(&mut self.search_query);
-
-            if focus_search_box {
-                response.request_focus();
-            }
-
-            if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-                self.searching = false; // Remove the search bar when the use presses escape
-            }
-
-            if self.search_query != old_search_query {
-                logic::filter_file_list(self.search_query.clone());
-            }
-            logic::get_filtered_file_list()
-        } else {
-            file_list
-        };
-
         let display_image_preview =
             config::get_config_bool("display_image_preview").unwrap_or(false) && tab == "images";
 
@@ -735,59 +759,67 @@ impl FileListUi {
             file_list.len()
         };
 
-        // let mut table_properties = Vec::new();
-        // table_properties.push(("name", 0.0));
-        // table_properties.push(("size", 0.5));
-        // table_properties.push(("modified", 0.75));
+        // Column headers with sorting (only in list view)
+        if !display_image_preview {
+            let full_width = ui.available_width();
+            let header_height = ui.text_style_height(&egui::TextStyle::Small);
+            let (header_rect, header_response) =
+                ui.allocate_exact_size(egui::vec2(full_width, header_height), egui::Sense::click());
 
-        // if !display_image_preview {
-        //     // Display table headers
-        //     let full_width = ui.available_width();
-        //     let desired_size = egui::vec2(full_width, row_height);
-        //     let rect = ui.allocate_exact_size(desired_size, egui::Sense::hover()).0;
+            let visuals = ui.visuals().clone();
+            let header_bg = visuals.widgets.noninteractive.bg_fill;
+            ui.painter().rect_filled(header_rect, 0.0, header_bg);
 
-        //     for property in table_properties {
-        //         let size = rect.size();
-        //         println!("{}", property.1size.x);
-        //         let property_rect = egui::Rect::from_min_size(
-        //             rect.min + egui::vec2(property.1size.x, 0.0),
-        //             egui::vec2((1.0-property.1)size.x, size.y)
-        //         );
+            let sort_col = logic::get_sort_column();
+            let sort_dir = logic::get_sort_direction();
+            let sort_indicator = match (&sort_col, &sort_dir) {
+                (logic::SortColumn::Name, logic::SortDirection::Ascending) => " ▲",
+                (logic::SortColumn::Name, logic::SortDirection::Descending) => " ▼",
+                _ => "",
+            };
 
-        //         ui.put(property_rect,
-        //         egui::Label::new(property.0).truncate().selectable(false));
-        //     }
+            let name_label = format!(
+                "{}{}",
+                locale::get_message(&self.locale, "col-name", None),
+                sort_indicator
+            );
+            let name_text = egui::RichText::new(&name_label)
+                .text_style(egui::TextStyle::Small)
+                .color(visuals.text_color());
 
-        //     // // Column positions
-        //     // let alias_x = rect.min.x + 5.0;
-        //     // let size_x = rect.min.x + rect.width() * 0.7;
-        //     // let modified_x = rect.min.x + rect.width() * 1.0 - 5.0; // adjust for padding
+            ui.put(
+                egui::Rect::from_min_size(
+                    header_rect.min + egui::vec2(8.0, 0.0),
+                    egui::vec2(header_rect.width() * 0.7, header_height),
+                ),
+                egui::Label::new(name_text).selectable(false),
+            );
 
-        //     // // Draw all columns
-        //     // ui.painter().text(
-        //     //     egui::pos2(alias_x+5, rect.min.y),
-        //     //     egui::Align2::LEFT_TOP,
-        //     //     "Name",
-        //     //     egui::TextStyle::Body.resolve(ui.style()),
-        //     //     visuals.text_color(),
-        //     // );
+            let source_label = "Source";
+            let source_text = egui::RichText::new(source_label)
+                .text_style(egui::TextStyle::Small)
+                .color(visuals.text_color());
 
-        //     // ui.painter().text(
-        //     //     egui::pos2(size_x+5, rect.min.y),
-        //     //     egui::Align2::LEFT_TOP,
-        //     //     "Size",
-        //     //     egui::TextStyle::Body.resolve(ui.style()),
-        //     //     visuals.text_color(),
-        //     // );
+            ui.put(
+                egui::Rect::from_min_size(
+                    header_rect.min + egui::vec2(header_rect.width() * 0.7, 0.0),
+                    egui::vec2(header_rect.width() * 0.3, header_height),
+                ),
+                egui::Label::new(source_text).selectable(false),
+            );
 
-        //     // ui.painter().text(
-        //     //     egui::pos2(modified_x+5, rect.min.y),
-        //     //     egui::Align2::LEFT_TOP,
-        //     //     "Modified",
-        //     //     egui::TextStyle::Body.resolve(ui.style()),
-        //     //     visuals.text_color(),
-        //     // );
-        // }
+            if header_response.clicked() {
+                logic::toggle_sort(logic::SortColumn::Name);
+                let mut list = if self.searching {
+                    logic::get_filtered_file_list()
+                } else {
+                    logic::get_file_list()
+                };
+                logic::apply_sort(&mut list);
+            }
+
+            ui.separator();
+        }
 
         // File list for assets
         egui::ScrollArea::vertical().auto_shrink(false).show_rows(
@@ -920,10 +952,10 @@ impl FileListUi {
                                 let (rect, response) =
                                     ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-                                let visuals = ui.visuals();
+                                let visuals = ui.visuals().clone();
                                 let colours = self.handle_asset_response(
                                     response,
-                                    visuals,
+                                    &visuals,
                                     is_selected,
                                     i,
                                     scroll_to,
@@ -947,10 +979,9 @@ impl FileListUi {
 
                                 // Column positions (add padding)
                                 let alias_x = rect.min.x + 5.0;
-                                // let size_x = rect.min.x + rect.width() * 0.7;
-                                // let modified_x = rect.min.x + rect.width() * 1.0 - 5.0; // adjust for padding
+                                let source_x = rect.min.x + rect.width() * 0.7;
 
-                                // Draw all columns
+                                // Draw name column
                                 ui.painter().text(
                                     egui::pos2(alias_x, rect.min.y),
                                     egui::Align2::LEFT_TOP,
@@ -959,22 +990,43 @@ impl FileListUi {
                                     text_colour,
                                 );
 
-                                // These are for later, broken rn
-                                //     ui.painter().text(
-                                //         egui::pos2(size_x, rect.min.y),
-                                //         egui::Align2::RIGHT_TOP,
-                                //         size,
-                                //         egui::TextStyle::Body.resolve(ui.style()),
-                                //         text_colour,
-                                //     );
+                                // Draw source indicator badge
+                                let source_label = if asset.from_rbx_storage {
+                                    locale::get_message(&self.locale, "source-rbx-storage", None)
+                                } else if asset.from_sql {
+                                    locale::get_message(&self.locale, "source-sql", None)
+                                } else if asset.from_file {
+                                    locale::get_message(&self.locale, "source-cache", None)
+                                } else {
+                                    String::new()
+                                };
 
-                                //     ui.painter().text(
-                                //         egui::pos2(modified_x, rect.min.y),
-                                //         egui::Align2::RIGHT_TOP,
-                                //         modified,
-                                //         egui::TextStyle::Body.resolve(ui.style()),
-                                //         text_colour,
-                                //     );
+                                if !source_label.is_empty() {
+                                    let badge_text = egui::RichText::new(&source_label)
+                                        .text_style(egui::TextStyle::Small)
+                                        .color(text_colour);
+
+                                    let badge_rect = egui::Rect::from_min_max(
+                                        egui::pos2(source_x + 4.0, rect.min.y + 1.0),
+                                        egui::pos2(rect.max.x - 4.0, rect.max.y - 1.0),
+                                    );
+
+                                    let badge_bg = if visuals.dark_mode {
+                                        egui::Color32::from_rgba_unmultiplied(60, 60, 60, 120)
+                                    } else {
+                                        egui::Color32::from_rgba_unmultiplied(220, 220, 220, 120)
+                                    };
+
+                                    ui.painter().rect_filled(badge_rect, 4.0, badge_bg);
+
+                                    ui.put(
+                                        egui::Rect::from_min_size(
+                                            badge_rect.min + egui::vec2(4.0, 0.0),
+                                            badge_rect.size(),
+                                        ),
+                                        egui::Label::new(badge_text).truncate().selectable(false),
+                                    );
+                                }
                             }
                         }
                     }

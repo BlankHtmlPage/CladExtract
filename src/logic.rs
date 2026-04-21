@@ -34,6 +34,100 @@ static STOP_LIST_RUNNING: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(fa
 static FILTERED_FILE_LIST: LazyLock<Mutex<Vec<AssetInfo>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 static TASK_RUNNING: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false)); // Delete/extract
+static TOASTS: LazyLock<Mutex<Vec<Toast>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+static SORT_COLUMN: LazyLock<Mutex<SortColumn>> = LazyLock::new(|| Mutex::new(SortColumn::None));
+static SORT_DIRECTION: LazyLock<Mutex<SortDirection>> =
+    LazyLock::new(|| Mutex::new(SortDirection::Ascending));
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SortColumn {
+    None,
+    Name,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SortDirection {
+    Ascending,
+    Descending,
+}
+
+#[derive(Debug, Clone)]
+pub enum ToastKind {
+    Info,
+    Warning,
+    Error,
+    Success,
+}
+
+#[derive(Debug, Clone)]
+pub struct Toast {
+    pub message: String,
+    pub kind: ToastKind,
+    pub dismiss_after: std::time::Instant,
+}
+
+pub fn push_toast(message: String, kind: ToastKind) {
+    let mut toasts = TOASTS.lock().unwrap();
+    toasts.push(Toast {
+        message,
+        kind,
+        dismiss_after: std::time::Instant::now() + std::time::Duration::from_secs(4),
+    });
+    let mut request = REQUEST_REPAINT.lock().unwrap();
+    *request = true;
+}
+
+pub fn get_toasts() -> Vec<Toast> {
+    let mut toasts = TOASTS.lock().unwrap();
+    let now = std::time::Instant::now();
+    toasts.retain(|t| t.dismiss_after > now);
+    toasts.clone()
+}
+
+pub fn get_sort_column() -> SortColumn {
+    SORT_COLUMN.lock().unwrap().clone()
+}
+
+pub fn get_sort_direction() -> SortDirection {
+    SORT_DIRECTION.lock().unwrap().clone()
+}
+
+pub fn toggle_sort(column: SortColumn) {
+    let mut col = SORT_COLUMN.lock().unwrap();
+    let mut dir = SORT_DIRECTION.lock().unwrap();
+    if *col == column {
+        *dir = match *dir {
+            SortDirection::Ascending => SortDirection::Descending,
+            SortDirection::Descending => SortDirection::Ascending,
+        };
+    } else {
+        *col = column;
+        *dir = SortDirection::Ascending;
+    }
+}
+
+pub fn reset_sort() {
+    *SORT_COLUMN.lock().unwrap() = SortColumn::None;
+    *SORT_DIRECTION.lock().unwrap() = SortDirection::Ascending;
+}
+
+pub fn apply_sort(list: &mut Vec<AssetInfo>) {
+    let column = get_sort_column();
+    let direction = get_sort_direction();
+    if column == SortColumn::None {
+        return;
+    }
+    list.sort_by(|a, b| {
+        let ord = match &column {
+            SortColumn::Name => a.name.cmp(&b.name),
+            SortColumn::None => std::cmp::Ordering::Equal,
+        };
+        match direction {
+            SortDirection::Ascending => ord,
+            SortDirection::Descending => ord.reverse(),
+        }
+    });
+}
 
 // CLI stuff
 #[derive(ValueEnum, Clone, Debug, Eq, PartialEq, Hash, Copy, EnumIter, Display)]
@@ -246,6 +340,10 @@ pub fn clear_cache() {
                 *task = false; // Allow other threads to run again
             }
             update_status(locale::get_message(&locale, "idling", None)); // Set the status back
+            push_toast(
+                locale::get_message(&locale, "toast-clear-cache-success", None),
+                ToastKind::Success,
+            );
         });
     }
 }
@@ -437,6 +535,10 @@ pub fn extract_dir(
                 *task = false; // Allow other threads to run again
             }
             update_status(locale::get_message(&locale, "all-extracted", None)); // Set the status to confirm to the user that all has finished
+            push_toast(
+                locale::get_message(&locale, "toast-extract-success", None),
+                ToastKind::Success,
+            );
         });
 
         if yield_for_thread {
@@ -473,6 +575,10 @@ pub fn extract_all(destination: PathBuf, yield_for_thread: bool, use_alias: bool
                 *task = false; // Allow other threads to run again
             }
             update_status(locale::get_message(&locale, "all-extracted", None)); // Set the status to confirm to the user that all has finished
+            push_toast(
+                locale::get_message(&locale, "toast-extract-success", None),
+                ToastKind::Success,
+            );
         });
 
         if yield_for_thread {
@@ -537,6 +643,10 @@ pub fn swap_assets(asset_a: AssetInfo, asset_b: AssetInfo) {
         args.set("item_a", asset_a.name);
         args.set("item_b", asset_b.name);
         update_status(locale::get_message(&locale, "swapped", Some(&args)));
+        push_toast(
+            locale::get_message(&locale, "toast-swap-success", None),
+            ToastKind::Success,
+        );
     }
 }
 
@@ -595,6 +705,10 @@ pub fn copy_assets(asset_a: AssetInfo, asset_b: AssetInfo) {
         args.set("item_a", asset_a.name);
         args.set("item_b", asset_b.name);
         update_status(locale::get_message(&locale, "copied", Some(&args)));
+        push_toast(
+            locale::get_message(&locale, "toast-copy-success", None),
+            ToastKind::Success,
+        );
     }
 }
 

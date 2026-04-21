@@ -36,6 +36,43 @@ button-extract-file = Extract <Ctrl+E>
 button-display-image-preview = Show Image Previews
 button-disable-display-image-preview = Hide Image Previews
 input-preview-size = Preview Size
+button-reset-layout = Reset Layout
+button-stop = Stop
+
+# Column headers
+col-name = Name
+col-sort-asc = Sort ascending
+col-sort-desc = Sort descending
+
+# Empty state
+empty-state-title = No Assets Found
+empty-state-description = Run the Roblox client at least once, then click Refresh to detect cached assets.
+empty-state-hint = If extraction is slow, try clearing the cache first.
+
+# Source indicators
+source-cache = Cache
+source-sql = SQL
+source-rbx-storage = Storage
+
+# Toast notifications
+toast-error = Error
+toast-warning = Warning
+toast-success = Success
+toast-clear-cache-success = Cache cleared successfully
+toast-extract-success = Extraction complete
+toast-swap-success = Assets swapped
+toast-copy-success = Asset copied
+
+# Keyboard shortcuts
+shortcuts-label = Shortcuts
+shortcut-refresh = F5
+shortcut-rename = F2
+shortcut-search = Ctrl+F
+shortcut-extract = F3 / Ctrl+E
+shortcut-swap = F4
+shortcut-copy = Ctrl+C
+shortcut-cancel = Esc
+shortcut-delete = Del
 
 # Confirmations
 confirmation-filter-confirmation-title = Filtering in Progress
@@ -69,6 +106,8 @@ new-updates = Updates Available
 contributors = Contributors
 dependencies = Dependencies
 behavior = Behavior
+paths = Paths
+appearance = Appearance
 
 # Checkboxes
 check-for-updates = Check for Updates
@@ -91,6 +130,7 @@ swap-with = Double-click a file to swap with "{ $asset }"
 logs-description = Application logs and error details are displayed here.
 copy-choose-file = Double-click a file to copy.
 overwrite-with = Double-click a file to overwrite "{ $asset }"
+language-search-placeholder = Filter languages...
 
 # Statuses
 idling = Idling
