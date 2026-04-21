@@ -1,10 +1,10 @@
 # CladExtract
 
-**CladExtract** is a fork of [RoExtract](https://github.com/AeEn123/RoExtract) — a tool for extracting cached assets from your Roblox installation.
+**CladExtract** is a fork of [RoExtract](https://github.com/AeEn123/RoExtract) - a tool for extracting cached assets from your Roblox installation.
 
 ## AI-Maintained Project
 
-CladExtract is **100% maintained by artificial intelligence** (currently Qwen 3.6 Plus). All development, bug fixes, feature additions, and refactoring are performed by an AI assistant. This project serves as both a practical tool and an experiment in autonomous software maintenance.
+CladExtract is **100% maintained by artificial intelligence** (currently Gemma 4 31B). All development, bug fixes, feature additions, and refactoring are performed by an AI assistant.
 
 ## About
 
