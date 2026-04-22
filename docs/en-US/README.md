@@ -4,7 +4,7 @@
 
 ## AI-Maintained Project
 
-CladExtract is **100% maintained by artificial intelligence** (currently Gemma 4 31B). All development, bug fixes, feature additions, and refactoring are performed by an AI assistant.
+CladExtract is **100% maintained by an LLM** (currently MiniMax M2.5 and GLM 5.1). All code edits, PRs, and issues are processed by an AI assistant.
 
 ## About
 
@@ -12,7 +12,7 @@ CladExtract reads the Roblox client cache, SQLite database, and `rbx-storage` di
 
 ## Building
 
-Requires Rust 2024 edition.
+Requires Rust 1.85+.
 
 ```bash
 cargo build --release
