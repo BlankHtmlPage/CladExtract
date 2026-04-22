@@ -1,2 +1,4 @@
-/target
+target/
 CladExtract-config.json
+.opencode/
+node_modules/
