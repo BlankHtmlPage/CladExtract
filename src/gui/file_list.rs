@@ -1,19 +1,12 @@
 use crate::{
-    config, gui, locale,
+    config, locale,
     logic::{self, AssetInfo},
 };
-use egui::{Color32, TextureHandle};
+use crate::gui::image_preview;
 // Used for functionality
 use fluent_bundle::{FluentBundle, FluentResource};
 use native_dialog::{DialogBuilder, MessageLevel};
-use std::num::NonZero;
-use std::{
-    sync::{Arc, LazyLock, Mutex},
-    thread,
-    time::Duration,
-};
-
-static ASSETS_LOADING: LazyLock<Mutex<Vec<String>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+use std::sync::Arc;
 
 fn double_click(
     asset: logic::AssetInfo,
@@ -24,14 +17,14 @@ fn double_click(
     if *copying {
         if swapping_asset.is_none() {
             *swapping_asset = Some(asset);
-        } else {
-            logic::copy_assets(swapping_asset.clone().unwrap(), asset);
+        } else if let Some(ref src_asset) = *swapping_asset {
+            logic::copy_assets(src_asset.clone(), asset);
         }
     } else if *swapping {
         if swapping_asset.is_none() {
             *swapping_asset = Some(asset);
-        } else {
-            logic::swap_assets(swapping_asset.clone().unwrap(), asset);
+        } else if let Some(ref src_asset) = *swapping_asset {
+            logic::swap_assets(src_asset.clone(), asset);
             *swapping_asset = None;
             *swapping = false
         }
@@ -83,15 +76,13 @@ fn extract_all_of_type(category: logic::Category, locale: &FluentBundle<Arc<Flue
             ))
             .confirm()
             .show()
-            .unwrap();
+            .unwrap_or(false);
     }
 
     // The user either agreed or the program is not listing files
     if !no {
-        let option_path = DialogBuilder::file().open_single_dir().show().unwrap();
-
         // If the user provides a directory, the program will extract the assets to that directory
-        if let Some(path) = option_path {
+        if let Ok(Some(path)) = DialogBuilder::file().open_single_dir().show() {
             logic::extract_dir(
                 path,
                 category,
@@ -150,60 +141,7 @@ fn extract_file_button(asset: logic::AssetInfo) {
     }
 }
 
-fn load_asset_image(asset: AssetInfo, ctx: egui::Context) -> Option<TextureHandle> {
-    let images = { gui::IMAGES.lock().unwrap().clone() };
-    if let Some(texture) = images.get(&asset.name) {
-        Some(texture.clone())
-    } else {
-        {
-            let assets_loading = ASSETS_LOADING.lock().unwrap().clone(); // Default to 2 CPU threads
-            if assets_loading.contains(&asset.name)
-                || assets_loading.len()
-                    >= thread::available_parallelism()
-                        .unwrap_or(NonZero::new(2).unwrap())
-                        .into()
-            {
-                return None; // Don't load multiple at a time or more than CPU threads
-            }
-        }
-        thread::spawn(move || {
-            {
-                let mut assets_loading = ASSETS_LOADING.lock().unwrap();
-                assets_loading.push(asset.name.clone()); // Add the asset to the loading set
-            }
-
-            match logic::extract_asset_to_bytes(asset.clone()) {
-                Ok(bytes) => {
-                    match gui::load_image(&asset.name, bytes.as_slice(), ctx) {
-                        Ok(_) => {
-                            let mut assets_loading = ASSETS_LOADING.lock().unwrap();
-                            assets_loading.retain(|x| x != &asset.name); // Remove the asset from the loading set
-                        }
-                        Err(e) => {
-                            log_warn!(
-                                "Failed to load {} as image, cooldown for 1000 ms ({})",
-                                asset.name,
-                                e
-                            );
-                            thread::sleep(Duration::from_millis(1000));
-                            let mut assets_loading = ASSETS_LOADING.lock().unwrap();
-                            assets_loading.retain(|x| x != &asset.name); // Remove the asset from the loading set
-                        }
-                    }
-                }
-                Err(e) => {
-                    log_error!("Unable read file, 1000 ms cooldown: {}", e);
-                    thread::sleep(Duration::from_millis(1000));
-                    let mut assets_loading = ASSETS_LOADING.lock().unwrap();
-                    assets_loading.retain(|x| x != &asset.name); // Remove the asset from the loading set
-                }
-            }
-        });
-        None
-    }
-}
-
-fn clear_cache(locale: &FluentBundle<Arc<FluentResource>>) {
+fn clear_cache(locale: &FluentBundle<Arc<FluentResource>>, ctx: &egui::Context) {
     // Confirmation dialog
     let yes = DialogBuilder::message()
         .set_level(MessageLevel::Info)
@@ -222,6 +160,7 @@ fn clear_cache(locale: &FluentBundle<Arc<FluentResource>>) {
         .unwrap();
 
     if yes {
+        image_preview::clear_all_images(ctx);
         logic::clear_cache();
     }
 }
@@ -260,26 +199,9 @@ fn toggle_swap_or_copy(
     }
 }
 
-// fn format_size(bytes: u64) -> String {
-//     const UNITS: [&str; 4] = ["KB", "MB", "GB", "TB"];
-//     let mut size = bytes as f64 / 1024.0;
-//     let mut unit_idx = 0;
-
-//     while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
-//         size /= 1024.0;
-//         unit_idx += 1;
-//     }
-//     format!("{:.1} {}", size, UNITS[unit_idx])
-// }
-
-// fn format_modified(time: std::time::SystemTime) -> String {
-//     let datetime: chrono::DateTime<chrono::Local> = time.into();
-//     datetime.format("%Y-%m-%d %H:%M").to_string()
-// }
-
 pub struct FileListUi {
-    selected: Option<usize>, // Used for storing selected state to retain keyboard navigation as seen in the tkinter version
-    current_tab: Option<String>, // Allows for detecting when the user changes tabs to refresh automatically
+    selected: Option<usize>,
+    current_tab: Option<String>,
     renaming: bool,
     searching: bool,
     search_query: String,
@@ -289,26 +211,6 @@ pub struct FileListUi {
     copying: bool,
     pub locale: FluentBundle<Arc<FluentResource>>,
 }
-// selected: Option<usize>, // Used for storing selected state to retain keyboard navigation as seen in the tkinter version
-// current_tab: Option<String>, // Allows for detecting when the user changes tabs to refresh automatically
-// renaming: bool,
-// searching: bool,
-// search_query: String,
-// swapping: bool,
-// swapping_asset: Option<logic::AssetInfo>,
-// asset_context_menu_open: Option<usize>,
-// copying: bool,
-
-// selected: &'a mut Option<usize>,
-// current_tab: &'a mut Option<String>,
-// renaming: &'a mut bool,
-// searching: &'a mut bool,
-// search_query: &'a mut String,
-// swapping: &'a mut bool,
-// swapping_asset: &'a mut Option<logic::AssetInfo>,
-// locale: &'a mut FluentBundle<Arc<FluentResource>>,
-// asset_context_menu_open: &'a mut Option<usize>,
-// copying: &'a mut bool,
 
 impl FileListUi {
     fn handle_text_edit(&mut self, ui: &mut egui::Ui, alias: &str, file_name: &str) {
@@ -391,7 +293,7 @@ impl FileListUi {
             .clicked()
             || ui.input(|i| i.key_pressed(egui::Key::Delete))
         {
-            clear_cache(&self.locale);
+            clear_cache(&self.locale, ui.ctx());
             self.asset_context_menu_open = None;
         }
 
@@ -440,7 +342,7 @@ impl FileListUi {
             }
         }
 
-        if category == logic::Category::Images {
+        if category == logic::Category::Images || category == logic::Category::Ktx {
             let message = if config::get_config_bool("display_image_preview").unwrap_or(false) {
                 locale::get_message(&self.locale, "button-disable-display-image-preview", None)
             } else {
@@ -468,12 +370,12 @@ impl FileListUi {
         navigation_accepted: &mut bool,
         focus_search_box: &mut bool,
         asset: AssetInfo,
-    ) -> (Color32, Color32) {
+    ) -> (egui::Color32, egui::Color32) {
         // Highlight the background when selected
         let background_colour = if is_selected {
             visuals.selection.bg_fill // Primary colour
         } else {
-            Color32::TRANSPARENT // No background colour
+            egui::Color32::TRANSPARENT // No background colour
         };
 
         // Make the text have more contrast when selected
@@ -570,6 +472,11 @@ impl FileListUi {
             list
         };
 
+        // Handle F5 refresh shortcut before empty check so it works even when no assets
+        if ui.input(|i| i.key_pressed(egui::Key::F5)) {
+            logic::refresh(category, false, false);
+        }
+
         // Empty state
         if file_list.is_empty() {
             ui.vertical_centered(|ui| {
@@ -585,6 +492,13 @@ impl FileListUi {
                     None,
                 ));
                 ui.label(locale::get_message(&self.locale, "empty-state-hint", None));
+                ui.add_space(20.0);
+                if ui
+                    .button(locale::get_message(&self.locale, "button-refresh", None))
+                    .clicked()
+                {
+                    logic::refresh(category, false, false);
+                }
             });
             return;
         }
@@ -601,13 +515,10 @@ impl FileListUi {
         }
         if ui.input(|i| i.key_pressed(egui::Key::Delete)) && !self.renaming {
             // del key used for editing, don't allow during editing
-            clear_cache(&self.locale);
+            clear_cache(&self.locale, ui.ctx());
         }
         if ui.input(|i| i.key_pressed(egui::Key::F3)) {
             extract_all_of_type(category, &self.locale);
-        }
-        if ui.input(|i| i.key_pressed(egui::Key::F5)) {
-            logic::refresh(category, false, false);
         }
         if ui.input(|i| i.modifiers.ctrl && i.key_pressed(egui::Key::D)) {
             // Ctrl+D (Swap)
@@ -708,26 +619,24 @@ impl FileListUi {
         let mut navigation_accepted: bool = false; // Used to check if the selected label is available to accept the keyboard navigation
 
         if self.swapping {
-            if self.swapping_asset.as_ref().is_none() {
-                ui.heading(locale::get_message(&self.locale, "swap-choose-file", None));
-            } else {
+            if let Some(ref asset) = self.swapping_asset {
                 let mut args = fluent_bundle::FluentArgs::new();
                 args.set(
                     "asset",
-                    config::get_asset_alias(&self.swapping_asset.as_ref().unwrap().name),
+                    config::get_asset_alias(&asset.name),
                 );
                 ui.heading(locale::get_message(&self.locale, "swap-with", Some(&args)));
+            } else {
+                ui.heading(locale::get_message(&self.locale, "swap-choose-file", None));
             }
         }
 
         if self.copying {
-            if self.swapping_asset.as_ref().is_none() {
-                ui.heading(locale::get_message(&self.locale, "copy-choose-file", None));
-            } else {
+            if let Some(ref asset) = self.swapping_asset {
                 let mut args = fluent_bundle::FluentArgs::new();
                 args.set(
                     "asset",
-                    config::get_asset_alias(&self.swapping_asset.as_ref().unwrap().name),
+                    config::get_asset_alias(&asset.name),
                 );
                 ui.heading(locale::get_message(
                     &self.locale,
@@ -737,8 +646,9 @@ impl FileListUi {
             }
         }
 
+        let is_preview_tab = tab == "images" || tab == "ktx-files";
         let display_image_preview =
-            config::get_config_bool("display_image_preview").unwrap_or(false) && tab == "images";
+            config::get_config_bool("display_image_preview").unwrap_or(false) && is_preview_tab;
 
         let row_height = if display_image_preview {
             config::get_config_u64("image_preview_size").unwrap_or(128) as f32
@@ -860,7 +770,7 @@ impl FileListUi {
                                         if asset.from_file | asset.from_sql | asset.from_rbx_storage
                                         {
                                             if let Some(texture) =
-                                                load_asset_image(asset.clone(), ui.ctx().clone())
+                                                image_preview::load_asset_image(asset.clone(), ui.ctx().clone())
                                             {
                                                 egui::Image::new(&texture)
                                                     .maintain_aspect_ratio(true)

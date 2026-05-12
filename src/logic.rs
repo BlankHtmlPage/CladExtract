@@ -867,3 +867,121 @@ pub fn clean_up() {
         Err(e) => log_error!("Failed to clean up SQL database: {:?}", e),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_category_from_header_png() {
+        let png_data: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(determine_category(&png_data), Category::Images);
+    }
+
+    #[test]
+    fn test_category_from_header_webp() {
+        let webp_data: Vec<u8> = vec![
+            0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, // RIFF
+            0x57, 0x45, 0x42, 0x50, // WEBP
+            0x56, 0x50, 0x38, 0x4C, // VP8L
+        ];
+        assert_eq!(determine_category(&webp_data), Category::Images);
+    }
+
+    #[test]
+    fn test_category_from_header_ogg() {
+        let ogg_data = b"OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00";
+        assert_eq!(determine_category(ogg_data), Category::Sounds);
+    }
+
+    #[test]
+    fn test_category_from_header_id3_with_binary() {
+        let mut id3_data = vec![0x49, 0x44, 0x33]; // ID3
+        id3_data.extend(b"binary/".to_vec());
+        assert_eq!(determine_category(&id3_data), Category::Sounds);
+    }
+
+    #[test]
+    fn test_category_from_header_ktx() {
+        let ktx_data: Vec<u8> = vec![
+            0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
+        ];
+        assert_eq!(determine_category(&ktx_data), Category::Ktx);
+    }
+
+    #[test]
+    fn test_category_from_header_rbxm() {
+        let rbxm_data = b"<roblox!";
+        assert_eq!(determine_category(rbxm_data), Category::Rbxm);
+    }
+
+    #[test]
+    fn test_category_unknown_returns_all() {
+        let unknown_data = b"NOT A VALID FORMAT";
+        assert_eq!(determine_category(unknown_data), Category::All);
+    }
+
+    #[test]
+    fn test_get_headers_sounds() {
+        let headers = get_headers(&Category::Sounds);
+        assert!(headers.contains(&"OggS".to_string()));
+        assert!(headers.contains(&"ID3".to_string()));
+    }
+
+    #[test]
+    fn test_get_headers_images() {
+        let headers = get_headers(&Category::Images);
+        assert!(headers.contains(&"PNG".to_string()));
+        assert!(headers.contains(&"WEBP".to_string()));
+    }
+
+    #[test]
+    fn test_maybe_decompress_zstd() {
+        let original = b"Hello, this is test data for decompression!";
+        let compressed = zstd::encode_all(original.as_slice(), 3).expect("Failed to compress");
+        let decompressed = maybe_decompress(compressed);
+        assert_eq!(decompressed, original);
+    }
+
+    #[test]
+    fn test_maybe_decompress_non_zstd_unchanged() {
+        let data = b"This is not zstd compressed data";
+        let result = maybe_decompress(data.to_vec());
+        assert_eq!(result, data);
+    }
+
+    #[test]
+    fn test_bytes_contains_finds_pattern() {
+        let haystack = b"Hello, World!";
+        let needle = b"World";
+        assert!(bytes_contains(haystack, needle));
+    }
+
+    #[test]
+    fn test_bytes_contains_missing_pattern() {
+        let haystack = b"Hello, World!";
+        let needle = b"Missing";
+        assert!(!bytes_contains(haystack, needle));
+    }
+
+    #[test]
+    fn test_bytes_contains_empty_needle() {
+        let haystack = b"Hello, World!";
+        let needle = b"";
+        assert!(!bytes_contains(haystack, needle));
+    }
+
+    #[test]
+    fn test_bytes_search_finds_position() {
+        let haystack = b"Hello, World!";
+        let needle = b"World";
+        assert_eq!(bytes_search(haystack, needle), Some(7));
+    }
+
+    #[test]
+    fn test_bytes_search_returns_none() {
+        let haystack = b"Hello, World!";
+        let needle = b"Missing";
+        assert_eq!(bytes_search(haystack, needle), None);
+    }
+}

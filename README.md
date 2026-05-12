@@ -7,7 +7,7 @@ We speak [🇺🇸 English (United States)](docs/en-US/README.md) | *Can you spe
 
 ## AI-Maintained Project
 
-CladExtract is **100% maintained by an LLM** (currently MiniMax M2.5 and GLM 5.1). All code edits, PRs, and issues are processed by an AI assistant.
+CladExtract is **100% maintained by an LLM** (currently MiniMax M2.5). All code edits, PRs, and issues are processed by an AI assistant.
 
 ## About
 

@@ -31,7 +31,7 @@ pub fn actions(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentResource>>) {
                 ))
                 .confirm()
                 .show()
-                .unwrap();
+                .unwrap_or(false);
 
             if yes {
                 logic::clear_cache();
@@ -66,15 +66,13 @@ pub fn actions(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentResource>>) {
                     ))
                     .confirm()
                     .show()
-                    .unwrap();
+                    .unwrap_or(false);
             }
 
             // The user either agreed or the program is not listing files
             if !no {
-                let option_path = DialogBuilder::file().open_single_dir().show().unwrap();
-
                 // If the user provides a directory, the program will extract the assets to that directory
-                if let Some(path) = option_path {
+                if let Ok(Some(path)) = DialogBuilder::file().open_single_dir().show() {
                     logic::extract_all(
                         path,
                         false,
@@ -108,12 +106,10 @@ pub fn cache_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentR
         ui.horizontal(|ui| {
             if ui
                 .button(locale::get_message(locale, "button-change-cache-dir", None))
-                .clicked()
+.clicked()
             {
-                let option_path = DialogBuilder::file().open_single_dir().show().unwrap();
-
-                // If the user provides a directory, the program will change the cache directory to the new one
-                if let Some(path) = option_path {
+                // If the user provides a directory, the program will extract the assets to that directory
+                if let Ok(Some(path)) = DialogBuilder::file().open_single_dir().show() {
                     // Validation checks
                     match logic::cache_directory::validate_directory(
                         path.to_string_lossy().as_ref(),
@@ -139,7 +135,7 @@ pub fn cache_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentR
                                 ))
                                 .alert()
                                 .show()
-                                .unwrap();
+                                .ok();
                         }
                     }
                 }
@@ -179,10 +175,8 @@ pub fn sql_db_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentReso
                 .button(locale::get_message(locale, "button-change-sql-db", None))
                 .clicked()
             {
-                let option_path = DialogBuilder::file().open_single_file().show().unwrap();
-
                 // If the user provides a path, the program will change the SQL database to the new one
-                if let Some(path) = option_path {
+                if let Ok(Some(path)) = DialogBuilder::file().open_single_file().show() {
                     // Validation checks
                     match logic::sql_database::validate_file(path.to_string_lossy().as_ref()) {
                         Ok(directory) => {
@@ -206,7 +200,7 @@ pub fn sql_db_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentReso
                                 ))
                                 .alert()
                                 .show()
-                                .unwrap();
+                                .ok();
                         }
                     }
                 }
@@ -314,6 +308,14 @@ pub fn behavior(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentResource>>) {
                 .text(locale::get_message(locale, "input-preview-size", None)),
         );
         config::set_config_value("image_preview_size", image_preview_size.into());
+
+        let mut max_preview_dimension =
+            config::get_config_u64("max_preview_dimension").unwrap_or(4096);
+        ui.add(
+            egui::widgets::Slider::new(&mut max_preview_dimension, 256_u64..=8192_u64)
+                .text(locale::get_message(locale, "input-max-preview-dimension", None)),
+        );
+        config::set_config_value("max_preview_dimension", max_preview_dimension.into());
     });
 }
 
@@ -439,10 +441,8 @@ pub fn rbx_storage_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<F
                 ))
                 .clicked()
             {
-                let option_path = DialogBuilder::file().open_single_dir().show().unwrap();
-
                 // If the user provides a directory, the program will change the rbx-storage directory to the new one
-                if let Some(path) = option_path {
+                if let Ok(Some(path)) = DialogBuilder::file().open_single_dir().show() {
                     let path_str = path.to_string_lossy().to_string();
                     if path.is_dir() {
                         config::set_config_value("rbx_storage_directory", path_str.into());
@@ -461,10 +461,10 @@ pub fn rbx_storage_dir_management(ui: &mut egui::Ui, locale: &FluentBundle<Arc<F
                                 locale,
                                 "error-invalid-directory-description",
                                 None,
-                            ))
-                            .alert()
-                            .show()
-                            .unwrap();
+))
+                                .alert()
+                                .show()
+                                .ok();
                     }
                 }
             }

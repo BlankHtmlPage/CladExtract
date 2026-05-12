@@ -36,6 +36,7 @@ button-extract-file = Extract <Ctrl+E>
 button-display-image-preview = Show Image Previews
 button-disable-display-image-preview = Hide Image Previews
 input-preview-size = Preview Size
+input-max-preview-dimension = Max Preview Dimensions
 button-reset-layout = Reset Layout
 button-stop = Stop
 

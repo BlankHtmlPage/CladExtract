@@ -14,6 +14,7 @@ use crate::{config, locale, log, logic, updater}; // Used for functionality
 use eframe::egui::TextureHandle;
 
 mod file_list;
+pub mod image_preview;
 mod settings;
 mod welcome;
 
@@ -52,35 +53,31 @@ const DEPENDENCIES: [&str; 14] = [
 pub static IMAGES: LazyLock<Mutex<HashMap<String, TextureHandle>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-struct TabViewer<'a> {
-    locale: &'a mut FluentBundle<Arc<FluentResource>>,
-    file_list_ui: &'a mut file_list::FileListUi,
-}
-
-pub fn load_image(
+pub fn load_static_image(
     id: &str,
     data: &[u8],
     ctx: egui::Context,
-) -> Result<TextureHandle, image::ImageError> {
+) -> Option<TextureHandle> {
     let images = { IMAGES.lock().unwrap().clone() };
     if let Some(texture) = images.get(id) {
-        Ok(texture.clone())
-    } else {
-        let icon_image = image::load_from_memory(data)?;
-        let icon_rgba = icon_image.to_rgba8();
-        let icon_size = [icon_rgba.width() as usize, icon_rgba.height() as usize];
-        let texture = ctx.load_texture(
-            id,
-            egui::ColorImage::from_rgba_unmultiplied(
-                icon_size,
-                icon_rgba.as_flat_samples().as_slice(),
-            ),
-            Default::default(),
-        );
-        let mut images = IMAGES.lock().unwrap();
-        images.insert(id.to_string(), texture.clone());
-        Ok(texture)
+        return Some(texture.clone());
     }
+    let img = image::load_from_memory(data).ok()?;
+    let rgba = img.to_rgba8();
+    let size = [rgba.width() as usize, rgba.height() as usize];
+    let texture = ctx.load_texture(
+        id,
+        egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_flat_samples().as_slice()),
+        Default::default(),
+    );
+    let mut images = IMAGES.lock().unwrap();
+    images.insert(id.to_string(), texture.clone());
+    Some(texture)
+}
+
+struct TabViewer<'a> {
+    locale: &'a mut FluentBundle<Arc<FluentResource>>,
+    file_list_ui: &'a mut file_list::FileListUi,
 }
 
 impl TabViewer<'_> {}
@@ -169,7 +166,7 @@ impl egui_dock::TabViewer for TabViewer<'_> {
 
             // Display logo and name side by side
             ui.horizontal(|ui| {
-                if let Ok(texture) = load_image("ICON", ICON, ui.ctx().clone()) {
+                if let Some(texture) = load_static_image("ICON", ICON, ui.ctx().clone()) {
                     ui.add(egui::Image::new(&texture).fit_to_exact_size(egui::vec2(40.0, 40.0)));
                 }
                 ui.vertical(|ui| {

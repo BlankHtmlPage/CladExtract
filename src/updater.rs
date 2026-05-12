@@ -6,6 +6,7 @@ use std::{
 
 use reqwest::blocking::Client;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 use crate::{config, logic};
 
@@ -18,6 +19,37 @@ static UPDATE_FILE: LazyLock<Mutex<Option<PathBuf>>> = LazyLock::new(|| Mutex::n
 
 static URL: &str = "https://api.github.com/repos/BlankHtmlPage/CladExtract/releases/latest";
 static PRERELEASE_URL: &str = "https://api.github.com/repos/BlankHtmlPage/CladExtract/releases";
+
+fn compute_sha256(data: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hex::encode(hasher.finalize())
+}
+
+fn verify_file_hash(path: &PathBuf, expected_hash: &str) -> bool {
+    match fs::read(path) {
+        Ok(data) => {
+            let hash = compute_sha256(&data);
+            let hash_lower = hash.to_lowercase();
+            let expected_lower = expected_hash.to_lowercase();
+            if hash_lower == expected_lower {
+                log_info!("SHA256 verification passed for {}", path.display());
+                true
+            } else {
+                log_error!(
+                    "SHA256 mismatch! Expected: {}, Got: {}",
+                    expected_lower,
+                    hash_lower
+                );
+                false
+            }
+        }
+        Err(e) => {
+            log_error!("Failed to read file for hash verification: {}", e);
+            false
+        }
+    }
+}
 
 #[derive(Deserialize, Debug, Clone)]
 struct Asset {
@@ -141,8 +173,18 @@ pub fn download_update(url: &str, tag_name: Option<&str>) {
         Ok(data) => match data.bytes() {
             Ok(bytes) => {
                 let path = temp_dir.join(filename);
-                match fs::write(path.clone(), bytes) {
+                match fs::write(path.clone(), &bytes) {
                     Ok(_) => {
+                        let expected_hash = config::get_system_config_string("update-hash");
+                        if let Some(hash) = expected_hash {
+                            if !verify_file_hash(&path, &hash) {
+                                log_error!("Hash verification failed! Removing potentially compromised file.");
+                                let _ = fs::remove_file(path);
+                                return;
+                            }
+                        } else {
+                            log_warn!("No update hash configured - skipping verification. Consider configuring 'update-hash' in system config for security.");
+                        }
                         set_update_file(path);
                         config::set_config_value("current_tag_name", tag_name.into());
                         config::save_config_file();
