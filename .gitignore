@@ -2,3 +2,5 @@ target/
 CladExtract-config.json
 .opencode/
 node_modules/
+.ruff_cache/
+Cargo.lock
