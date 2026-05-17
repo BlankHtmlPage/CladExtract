@@ -132,11 +132,12 @@ jobs:
 
       - name: Process release body
         id: body
+        env:
+          RELEASE_BODY: ${{ inputs.release_body }}
         run: |
           # GitHub workflow_dispatch textarea doesn't support real newlines.
           # Users type literal \n which we convert to actual newlines here.
-          printf -v RAW '%s' '${{ inputs.release_body }}'
-          PROCESSED="${RAW//\\n/$'\n'}"
+          PROCESSED="${RELEASE_BODY//\\n/$'\n'}"
           echo "text<<EOF" >> "$GITHUB_OUTPUT"
           echo "$PROCESSED" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
