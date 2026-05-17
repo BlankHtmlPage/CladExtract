@@ -226,12 +226,16 @@ fn find_header(category: Category, bytes: &[u8]) -> Result<String, String> {
     Err("Headers not found in bytes".to_owned())
 }
 
+/// Extract bytes from a file starting at the magic header.
+/// The offset accounts for bytes that precede the searchable string in the actual file format:
+/// - PNG: 0x89 byte precedes "PNG" (offset 1)
+/// - KTX: 0xAB byte precedes "KTX" (offset 1)  
+/// - WEBP: "RIFF" + 4-byte size precedes "WEBP" (offset 8)
 fn extract_bytes(header: &str, bytes: Vec<u8>) -> Vec<u8> {
-    // Set offset depending on header
-    let offset: usize = match header {
-        "PNG" => 1,
-        "KTX" => 1,
-        "WEBP" => 8,
+    let offset = match header {
+        "PNG" => 1,  // 0x89 before "PNG"
+        "KTX" => 1,  // 0xAB before "KTX"
+        "WEBP" => 8, // "RIFF" + size before "WEBP"
         _ => 0,
     };
 
@@ -429,9 +433,9 @@ pub fn extract_to_file(
                 destination.set_extension(extension);
             }
 
-            extract_bytes(&header, bytes.clone()) // Extract between the header to the end of the file.
+            extract_bytes(&header, bytes)
         }
-        Err(_) => bytes.clone(), // No header was found.
+        Err(_) => bytes,
     };
 
     // Ensure parent directory exists (needed when asset name contains subdirectories,
@@ -462,8 +466,8 @@ pub fn extract_asset_to_bytes(asset: AssetInfo) -> Result<Vec<u8>, std::io::Erro
     let bytes = read_asset(&asset)?;
 
     match find_header(asset.category, &bytes) {
-        Ok(header) => Ok(extract_bytes(&header, bytes.clone())), // Extract between the header to the end of the file.
-        Err(_) => Ok(bytes.clone()),                             // No header was found.
+        Ok(header) => Ok(extract_bytes(&header, bytes)),
+        Err(_) => Ok(bytes),
     }
 }
 

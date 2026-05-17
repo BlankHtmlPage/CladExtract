@@ -72,7 +72,7 @@ fn clean_version_number(version: &str) -> String {
         .collect()
 }
 
-fn detect_download_binary(assets: &Vec<Asset>) -> &Asset {
+fn detect_download_binary(assets: &Vec<Asset>) -> Option<&Asset> {
     let os = std::env::consts::OS; // Get the user's operating system to download the correct binary
 
     for asset in assets {
@@ -86,12 +86,12 @@ fn detect_download_binary(assets: &Vec<Asset>) -> &Asset {
         };
 
         if name.contains(os) && installer {
-            return asset; // Return the correct binary based on OS
+            return Some(asset); // Return the correct binary based on OS
         }
     }
 
     log_warn!("Failed to find asset, going for first asset listed.");
-    &assets[0]
+    assets.first()
 }
 
 fn update_action(json: Release, run_gui: bool, auto_download_update: bool) {
@@ -99,7 +99,13 @@ fn update_action(json: Release, run_gui: bool, auto_download_update: bool) {
     log_info!("{}", &json.name);
     log_info!("{}", &json.body);
 
-    let correct_asset = detect_download_binary(&json.assets);
+    let correct_asset = match detect_download_binary(&json.assets) {
+        Some(asset) => asset,
+        None => {
+            log_error!("No assets found for download.");
+            return;
+        }
+    };
 
     if auto_download_update {
         let tag_name = if json.tag_name.contains("dev-build") {
@@ -262,6 +268,7 @@ pub fn run_install_script(run_afterwards: bool) -> bool {
                     ]);
                 }
 
+                config::save_config_file();
                 std::process::exit(0);
             }
 

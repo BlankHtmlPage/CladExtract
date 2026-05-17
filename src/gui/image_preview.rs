@@ -313,6 +313,39 @@ fn decode_ktx2(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
     Ok((width as u32, height as u32, rgba8))
 }
 
+/// Copy decoded 4x4 tiles into an RGBA8 pixel buffer.
+fn copy_tiles_to_rgba8(
+    tiles: &[u8],
+    width: usize,
+    height: usize,
+    block_size: usize,
+) -> Vec<u8> {
+    let blocks_x = (width + 3) / 4;
+    let stride = width * 4;
+    let mut rgba8 = vec![0u8; height * stride];
+
+    for by in 0..(height + 3) / 4 {
+        for bx in 0..blocks_x {
+            let tile_idx = by * blocks_x + bx;
+            let tile_offset = tile_idx * block_size;
+
+            for ty in 0..4 {
+                let py = by * 4 + ty;
+                if py >= height {
+                    break;
+                }
+                let row_offset = py * stride + bx * 4 * 4;
+                let tile_row_offset = ty * 16;
+                let copy_len = (4 * 4).min(stride.saturating_sub(bx * 4 * 4));
+                rgba8[row_offset..row_offset + copy_len]
+                    .copy_from_slice(&tiles[tile_offset + tile_row_offset..tile_offset + tile_row_offset + copy_len]);
+            }
+        }
+    }
+
+    rgba8
+}
+
 /// Decode BC1 (DXT1) compressed data to RGBA8 pixels.
 /// Each 8-byte block decodes to a 4×4 pixel tile.
 fn bc1_decode_rgba8(
@@ -332,32 +365,12 @@ fn bc1_decode_rgba8(
         ));
     }
 
-    let stride = width * 4;
-    let mut rgba8 = vec![0u8; height * stride];
-    let mut tile = [0u8; 4 * 4 * 4];
-
-    for by in 0..blocks_y {
-        for bx in 0..blocks_x {
-            let block_offset = (by * blocks_x + bx) * 8;
-            let block_data = &compressed[block_offset..block_offset + 8];
-
-            bcdec_rs::bc1(block_data, &mut tile, 16);
-
-            // Copy tile into the output image
-            for ty in 0..4 {
-                let py = by * 4 + ty;
-                if py >= height {
-                    break;
-                }
-                let row_offset = py * stride + bx * 4 * 4;
-                let tile_row_offset = ty * 16;
-                let copy_len = (4 * 4).min(stride.saturating_sub(bx * 4 * 4));
-                rgba8[row_offset..row_offset + copy_len]
-                    .copy_from_slice(&tile[tile_row_offset..tile_row_offset + copy_len]);
-            }
-        }
+    let mut decoded = vec![0u8; block_count * 4 * 4 * 4];
+    for i in 0..block_count {
+        bcdec_rs::bc1(&compressed[i * 8..i * 8 + 8], &mut decoded[i * 64..(i + 1) * 64], 16);
     }
 
+    let rgba8 = copy_tiles_to_rgba8(&decoded, width, height, 64);
     Ok((width as u32, height as u32, rgba8))
 }
 
@@ -378,31 +391,12 @@ fn bc7_decode_rgba8(
         ));
     }
 
-    let stride = width * 4;
-    let mut rgba8 = vec![0u8; height * stride];
-    let mut tile = [0u8; 4 * 4 * 4];
-
-    for by in 0..blocks_y {
-        for bx in 0..blocks_x {
-            let block_offset = (by * blocks_x + bx) * 16;
-            let block_data = &compressed[block_offset..block_offset + 16];
-
-            bcdec_rs::bc7(block_data, &mut tile, 16);
-
-            for ty in 0..4 {
-                let py = by * 4 + ty;
-                if py >= height {
-                    break;
-                }
-                let row_offset = py * stride + bx * 4 * 4;
-                let tile_row_offset = ty * 16;
-                let copy_len = (4 * 4).min(stride.saturating_sub(bx * 4 * 4));
-                rgba8[row_offset..row_offset + copy_len]
-                    .copy_from_slice(&tile[tile_row_offset..tile_row_offset + copy_len]);
-            }
-        }
+    let mut decoded = vec![0u8; block_count * 64];
+    for i in 0..block_count {
+        bcdec_rs::bc7(&compressed[i * 16..i * 16 + 16], &mut decoded[i * 64..(i + 1) * 64], 16);
     }
 
+    let rgba8 = copy_tiles_to_rgba8(&decoded, width, height, 64);
     Ok((width as u32, height as u32, rgba8))
 }
 
@@ -423,31 +417,12 @@ fn bc3_decode_rgba8(
         ));
     }
 
-    let stride = width * 4;
-    let mut rgba8 = vec![0u8; height * stride];
-    let mut tile = [0u8; 4 * 4 * 4];
-
-    for by in 0..blocks_y {
-        for bx in 0..blocks_x {
-            let block_offset = (by * blocks_x + bx) * 16;
-            let block_data = &compressed[block_offset..block_offset + 16];
-
-            bcdec_rs::bc3(block_data, &mut tile, 16);
-
-            for ty in 0..4 {
-                let py = by * 4 + ty;
-                if py >= height {
-                    break;
-                }
-                let row_offset = py * stride + bx * 4 * 4;
-                let tile_row_offset = ty * 16;
-                let copy_len = (4 * 4).min(stride.saturating_sub(bx * 4 * 4));
-                rgba8[row_offset..row_offset + copy_len]
-                    .copy_from_slice(&tile[tile_row_offset..tile_row_offset + copy_len]);
-            }
-        }
+    let mut decoded = vec![0u8; block_count * 64];
+    for i in 0..block_count {
+        bcdec_rs::bc3(&compressed[i * 16..i * 16 + 16], &mut decoded[i * 64..(i + 1) * 64], 16);
     }
 
+    let rgba8 = copy_tiles_to_rgba8(&decoded, width, height, 64);
     Ok((width as u32, height as u32, rgba8))
 }
 
