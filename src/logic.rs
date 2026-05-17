@@ -293,19 +293,29 @@ pub fn create_temp_dir() -> PathBuf {
 
 // Define public functions
 pub fn resolve_path(directory: &str) -> String {
-    // There's probably a better way of doing this... It works though :D
-    let resolved_path = directory
-        .replace(
-            "%Temp%",
-            &format!("C:\\Users\\{}\\AppData\\Local\\Temp", whoami::username()),
-        )
-        .replace(
-            "%localappdata%",
-            &format!("C:\\Users\\{}\\AppData\\Local", whoami::username()),
-        )
-        .replace("~", &format!("/home/{}", whoami::username()));
+    let username = whoami::username();
 
-    resolved_path
+    #[cfg(target_os = "windows")]
+    {
+        directory
+            .replace("%Temp%", &format!("C:\\Users\\{username}\\AppData\\Local\\Temp"))
+            .replace(
+                "%localappdata%",
+                &format!("C:\\Users\\{username}\\AppData\\Local"),
+            )
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Only replace a leading ~ with the home directory, not every ~ in the string
+        if let Some(rest) = directory.strip_prefix("~/") {
+            format!("/home/{username}/{rest}")
+        } else if directory == "~" {
+            format!("/home/{username}")
+        } else {
+            directory.to_string()
+        }
+    }
 }
 
 // Function to get temp directory, create it if it doesn't exist
@@ -433,10 +443,10 @@ pub fn extract_to_file(
         }
     }
 
-    match fs::write(destination.clone(), extracted_bytes) {
-        Ok(_) => (),
-        Err(e) => log_error!("Error writing file: {}", e),
-    };
+    fs::write(destination.clone(), extracted_bytes).map_err(|e| {
+        log_error!("Error writing file: {}", e);
+        e
+    })?;
 
     if let Some(sys_modified_time) = asset.last_modified {
         let modified_time = filetime::FileTime::from_system_time(sys_modified_time);
@@ -593,60 +603,45 @@ pub fn swap_assets(asset_a: AssetInfo, asset_b: AssetInfo) {
     let sql_database_result = sql_database::swap_assets(&asset_a, &asset_b);
     let rbx_storage_result = rbx_storage_directory::swap_assets(&asset_a, &asset_b);
 
-    // Confirmation and error messages
     let locale = locale::get_locale(None);
     let mut args = FluentArgs::new();
+    let mut errors = Vec::new();
 
-    if cache_directory_result.as_ref().is_err()
-        && sql_database_result.as_ref().is_err()
-        && rbx_storage_result.as_ref().is_err()
-    {
-        // cache_directory error
-        args.set(
-            "error",
-            cache_directory_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!(
-            "Error opening file '{}'",
-            cache_directory_result.unwrap_err()
-        );
+    if let Err(e) = &cache_directory_result {
+        errors.push(format!("cache: {e}"));
+        log_error!("Error swapping in cache: {e}");
+    }
+    if let Err(e) = &sql_database_result {
+        errors.push(format!("sql: {e}"));
+        log_error!("Error swapping in sql: {e}");
+    }
+    if let Err(e) = &rbx_storage_result {
+        errors.push(format!("rbx-storage: {e}"));
+        log_error!("Error swapping in rbx-storage: {e}");
+    }
 
-        // sql_database error
-        args.set(
-            "error",
-            sql_database_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!("Error opening file '{}'", sql_database_result.unwrap_err());
-
-        // rbx_storage error
-        args.set(
-            "error",
-            rbx_storage_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!("Error opening file '{}'", rbx_storage_result.unwrap_err());
+    if errors.len() == 3 {
+        // All backends failed
+        args.set("error", errors.join("; "));
+        update_status(locale::get_message(&locale, "failed-opening-file", Some(&args)));
     } else {
         args.set("item_a", asset_a.name);
         args.set("item_b", asset_b.name);
-        update_status(locale::get_message(&locale, "swapped", Some(&args)));
-        push_toast(
-            locale::get_message(&locale, "toast-swap-success", None),
-            ToastKind::Success,
-        );
+        if errors.is_empty() {
+            update_status(locale::get_message(&locale, "swapped", Some(&args)));
+            push_toast(
+                locale::get_message(&locale, "toast-swap-success", None),
+                ToastKind::Success,
+            );
+        } else {
+            // Partial success — some backends failed
+            log_warn!("Swap partially succeeded. Failures: {}", errors.join("; "));
+            update_status(locale::get_message(&locale, "swapped", Some(&args)));
+            push_toast(
+                format!("Swap partially succeeded ({})", errors.join("; ")),
+                ToastKind::Warning,
+            );
+        }
     }
 }
 
@@ -655,60 +650,45 @@ pub fn copy_assets(asset_a: AssetInfo, asset_b: AssetInfo) {
     let sql_database_result = sql_database::copy_assets(&asset_a, &asset_b);
     let rbx_storage_result = rbx_storage_directory::copy_assets(&asset_a, &asset_b);
 
-    // Confirmation and error messages
     let locale = locale::get_locale(None);
     let mut args = FluentArgs::new();
+    let mut errors = Vec::new();
 
-    if cache_directory_result.as_ref().is_err()
-        && sql_database_result.as_ref().is_err()
-        && rbx_storage_result.as_ref().is_err()
-    {
-        // cache_directory error
-        args.set(
-            "error",
-            cache_directory_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!(
-            "Error opening file '{}'",
-            cache_directory_result.unwrap_err()
-        );
+    if let Err(e) = &cache_directory_result {
+        errors.push(format!("cache: {e}"));
+        log_error!("Error copying in cache: {e}");
+    }
+    if let Err(e) = &sql_database_result {
+        errors.push(format!("sql: {e}"));
+        log_error!("Error copying in sql: {e}");
+    }
+    if let Err(e) = &rbx_storage_result {
+        errors.push(format!("rbx-storage: {e}"));
+        log_error!("Error copying in rbx-storage: {e}");
+    }
 
-        // sql_database error
-        args.set(
-            "error",
-            sql_database_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!("Error opening file '{}'", sql_database_result.unwrap_err());
-
-        // rbx_storage error
-        args.set(
-            "error",
-            rbx_storage_result.as_ref().unwrap_err().to_string(),
-        );
-        update_status(locale::get_message(
-            &locale,
-            "failed-opening-file",
-            Some(&args),
-        ));
-        log_error!("Error opening file '{}'", rbx_storage_result.unwrap_err());
+    if errors.len() == 3 {
+        // All backends failed
+        args.set("error", errors.join("; "));
+        update_status(locale::get_message(&locale, "failed-opening-file", Some(&args)));
     } else {
         args.set("item_a", asset_a.name);
         args.set("item_b", asset_b.name);
-        update_status(locale::get_message(&locale, "copied", Some(&args)));
-        push_toast(
-            locale::get_message(&locale, "toast-copy-success", None),
-            ToastKind::Success,
-        );
+        if errors.is_empty() {
+            update_status(locale::get_message(&locale, "copied", Some(&args)));
+            push_toast(
+                locale::get_message(&locale, "toast-copy-success", None),
+                ToastKind::Success,
+            );
+        } else {
+            // Partial success — some backends failed
+            log_warn!("Copy partially succeeded. Failures: {}", errors.join("; "));
+            update_status(locale::get_message(&locale, "copied", Some(&args)));
+            push_toast(
+                format!("Copy partially succeeded ({})", errors.join("; ")),
+                ToastKind::Warning,
+            );
+        }
     }
 }
 

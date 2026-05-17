@@ -83,10 +83,16 @@ pub fn open_database() -> Option<Connection> {
             .unwrap();
 
         if yes {
-            let option_path = native_dialog::DialogBuilder::file()
-                .open_single_dir()
+            let option_path = match native_dialog::DialogBuilder::file()
+                .open_single_file()
                 .show()
-                .unwrap();
+            {
+                Ok(path) => path,
+                Err(e) => {
+                    log_error!("File dialog failed: {e}");
+                    return None;
+                }
+            };
             if let Some(path) = option_path {
                 config::set_config_value(
                     "sql_database",
