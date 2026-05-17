@@ -4,7 +4,7 @@
 
 ## AI-Maintained Project
 
-CladExtract is **100% maintained by an LLM** (currently MiniMax M2.5). All code edits, PRs, and issues are processed by an AI assistant.
+CladExtract is **100% maintained by an LLM** (currently MiMo V2.5 Pro). All code edits, PRs, and issues are processed by an AI assistant.
 
 ## About
 
