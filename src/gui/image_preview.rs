@@ -35,9 +35,9 @@ const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: u32 = 0x8C4E;
 const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: u32 = 0x8C4F;
 const GL_COMPRESSED_RGBA_BPTC_UNORM_EXT: u32 = 0x8E8C;
 const GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT: u32 = 0x8E8D;
-// Roblox uses non-standard GL values for BC7 in KTX1
-const GL_COMPRESSED_RGBA_BPTC_ROBLOX: u32 = 0x9274;
-const GL_COMPRESSED_SRGB_ALPHA_BPTC_ROBLOX: u32 = 0x9278;
+// ETC2 format constants (used by Roblox KTX1 textures)
+const GL_COMPRESSED_RGB8_ETC2: u32 = 0x9274;
+const GL_COMPRESSED_RGBA8_ETC2_EAC: u32 = 0x9278;
 
 // Vulkan format constants (used by KTX2)
 const VK_FORMAT_BC1_RGB_UNORM_BLOCK: u32 = 131;
@@ -204,14 +204,24 @@ fn decode_ktx1(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
             bc3_decode_rgba8(pixel_data, width, height)?.2
         }
         // BC7 — UNORM (linear)
-        GL_COMPRESSED_RGBA_BPTC_UNORM_EXT | GL_COMPRESSED_RGBA_BPTC_ROBLOX => {
+        GL_COMPRESSED_RGBA_BPTC_UNORM_EXT => {
             is_srgb = false;
             bc7_decode_rgba8(pixel_data, width, height)?.2
         }
         // BC7 — sRGB
-        GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT | GL_COMPRESSED_SRGB_ALPHA_BPTC_ROBLOX => {
+        GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT => {
             is_srgb = true;
             bc7_decode_rgba8(pixel_data, width, height)?.2
+        }
+        // ETC2 RGB — UNORM (linear, used by Roblox)
+        GL_COMPRESSED_RGB8_ETC2 => {
+            is_srgb = false;
+            etc2_rgb_decode_rgba8(pixel_data, width, height)?.2
+        }
+        // ETC2 RGBA8 (EAC) — UNORM (linear, used by Roblox)
+        GL_COMPRESSED_RGBA8_ETC2_EAC => {
+            is_srgb = false;
+            etc2_rgba8_decode_rgba8(pixel_data, width, height)?.2
         }
         _ => {
             return Err(format!(
@@ -436,6 +446,51 @@ fn bc3_decode_rgba8(
                     .copy_from_slice(&tile[tile_row_offset..tile_row_offset + copy_len]);
             }
         }
+    }
+
+    Ok((width as u32, height as u32, rgba8))
+}
+
+/// Decode ETC2 RGB compressed data to RGBA8 pixels.
+/// texture2ddecoder outputs ARGB u32 pixels (le bytes: [b, g, r, a]).
+fn etc2_rgb_decode_rgba8(
+    compressed: &[u8],
+    width: usize,
+    height: usize,
+) -> Result<(u32, u32, Vec<u8>), String> {
+    let mut pixels = vec![0u32; width * height];
+    texture2ddecoder::decode_etc2_rgb(compressed, width, height, &mut pixels)
+        .map_err(|e| format!("ETC2 RGB decode: {e}"))?;
+
+    let mut rgba8 = Vec::with_capacity(pixels.len() * 4);
+    for pixel in &pixels {
+        let bytes = pixel.to_le_bytes(); // [b, g, r, a]
+        rgba8.push(bytes[2]); // R
+        rgba8.push(bytes[1]); // G
+        rgba8.push(bytes[0]); // B
+        rgba8.push(bytes[3]); // A
+    }
+
+    Ok((width as u32, height as u32, rgba8))
+}
+
+/// Decode ETC2 RGBA8 (EAC) compressed data to RGBA8 pixels.
+fn etc2_rgba8_decode_rgba8(
+    compressed: &[u8],
+    width: usize,
+    height: usize,
+) -> Result<(u32, u32, Vec<u8>), String> {
+    let mut pixels = vec![0u32; width * height];
+    texture2ddecoder::decode_etc2_rgba8(compressed, width, height, &mut pixels)
+        .map_err(|e| format!("ETC2 RGBA8 decode: {e}"))?;
+
+    let mut rgba8 = Vec::with_capacity(pixels.len() * 4);
+    for pixel in &pixels {
+        let bytes = pixel.to_le_bytes(); // [b, g, r, a]
+        rgba8.push(bytes[2]); // R
+        rgba8.push(bytes[1]); // G
+        rgba8.push(bytes[0]); // B
+        rgba8.push(bytes[3]); // A
     }
 
     Ok((width as u32, height as u32, rgba8))

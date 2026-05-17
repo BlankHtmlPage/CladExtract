@@ -25,6 +25,7 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 sha2 = "0.10"
 strum = { version = "0.27", features = ["derive"] }
 sys-locale = "0.3"
+texture2ddecoder = "0.1"
 unic-langid = "0.9"
 whoami = { version = "1.6", default-features = false }
 zstd = { version = "0.13", default-features = false }
