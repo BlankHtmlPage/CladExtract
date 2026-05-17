@@ -19,7 +19,7 @@ on:
       release_body:
         description: "Release notes / changelog (Markdown supported)"
         required: false
-        type: string
+        type: textarea
         default: ""
 
 permissions:
