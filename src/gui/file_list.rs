@@ -19,6 +19,8 @@ fn double_click(
             *swapping_asset = Some(asset);
         } else if let Some(ref src_asset) = *swapping_asset {
             logic::copy_assets(src_asset.clone(), asset);
+            *swapping_asset = None;
+            *copying = false;
         }
     } else if *swapping {
         if swapping_asset.is_none() {
@@ -332,7 +334,7 @@ impl FileListUi {
             .button(locale::get_message(&self.locale, "button-copy", None))
             .clicked()
         {
-            toggle_swap(&mut self.copying, &mut self.swapping_asset, &self.locale);
+            toggle_swap_or_copy(&mut self.copying, &mut self.swapping_asset, &self.locale);
             self.asset_context_menu_open = None;
 
             if let Some(n) = asset.clone() {
@@ -447,7 +449,7 @@ impl FileListUi {
         let mut focus_search_box = false; // Focus the search box toggle for this frame
 
         // Apply current sort to the file list
-        let mut file_list = if self.searching {
+        let file_list = if self.searching {
             let old_search_query = self.search_query.clone();
 
             let response = ui.text_edit_singleline(&mut self.search_query);

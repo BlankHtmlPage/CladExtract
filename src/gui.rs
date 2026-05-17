@@ -360,7 +360,7 @@ impl eframe::App for MyApp {
                     format!("{}: {}", kind_label, toast.message)
                 };
 
-                let frame = egui::Frame::new()
+                let _frame = egui::Frame::new()
                     .fill(color)
                     .corner_radius(4.0)
                     .inner_margin(egui::vec2(10.0, 6.0));

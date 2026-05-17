@@ -280,12 +280,12 @@ pub fn behavior(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentResource>>) {
         );
         config::set_config_value("use_alias", use_alias.into());
 
-        let mut use_alias = config::get_config_bool("refresh_before_extract").unwrap_or(false);
+        let mut refresh_before_extract = config::get_config_bool("refresh_before_extract").unwrap_or(false);
         ui.checkbox(
-            &mut use_alias,
+            &mut refresh_before_extract,
             locale::get_message(locale, "refresh-before-extract", None),
         );
-        config::set_config_value("refresh_before_extract", use_alias.into());
+        config::set_config_value("refresh_before_extract", refresh_before_extract.into());
 
         let mut use_topbar_buttons = config::get_config_bool("use_topbar_buttons").unwrap_or(true);
         ui.checkbox(
@@ -328,7 +328,7 @@ pub fn language(ui: &mut egui::Ui, locale: &FluentBundle<Arc<FluentResource>>) -
 
             let mut language_search =
                 config::get_config_string("language_search").unwrap_or_default();
-            let search_response = ui.add(
+            let _search_response = ui.add(
                 egui::TextEdit::singleline(&mut language_search)
                     .hint_text(locale::get_message(
                         locale,
