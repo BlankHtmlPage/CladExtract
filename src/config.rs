@@ -69,7 +69,7 @@ pub fn get_config() -> Value {
 
 pub fn get_config_string(key: &str) -> Option<String> {
     if let Some(value) = get_config().get(key) {
-        Some(value.as_str()?.to_owned().replace('"', "")) // For some reason returns in quotes, remove the quotes
+        Some(value.as_str()?.to_owned())
     } else {
         None
     }
@@ -94,7 +94,7 @@ pub fn get_config_u64(key: &str) -> Option<u64> {
 pub fn get_asset_alias(asset: &str) -> String {
     if let Some(aliases) = get_config().get("aliases") {
         if let Some(value) = aliases.get(asset) {
-            value.as_str().unwrap().to_owned().replace('"', "")
+            value.as_str().unwrap().to_owned()
         } else {
             asset.to_string()
         }
@@ -129,7 +129,7 @@ pub fn set_asset_alias(asset: &str, value: &str) {
         config["aliases"] = json!({});
     }
 
-    config["aliases"][asset] = value.replace('"', "").into();
+    config["aliases"][asset] = value.into();
     set_config(config);
 }
 
@@ -139,7 +139,7 @@ pub fn get_system_config() -> Value {
 
 pub fn get_system_config_string(key: &str) -> Option<String> {
     if let Some(value) = get_system_config().get(key) {
-        Some(value.as_str()?.to_owned().replace('"', "")) // For some reason returns in quotes, remove the quotes
+        Some(value.as_str()?.to_owned())
     } else {
         None
     }

@@ -52,6 +52,7 @@ pub enum SortDirection {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ToastKind {
     Info,
     Warning,
@@ -106,6 +107,7 @@ pub fn toggle_sort(column: SortColumn) {
     }
 }
 
+#[allow(dead_code)]
 pub fn reset_sort() {
     *SORT_COLUMN.lock().unwrap() = SortColumn::None;
     *SORT_DIRECTION.lock().unwrap() = SortDirection::Ascending;
@@ -365,23 +367,20 @@ pub fn refresh(category: Category, cli_list_mode: bool, yield_for_thread: bool) 
         let locale = locale::get_locale(None);
         // This loop here is to make it wait until it is not running, and to set the STOP_LIST_RUNNING to true if it is running to make the other thread
         loop {
-            let running = {
-                let task = LIST_TASK_RUNNING.lock().unwrap();
-                *task
-            };
-            if !running {
-                break; // Break if not running
-            } else {
+            {
+                let mut task = LIST_TASK_RUNNING.lock().unwrap();
+                if !*task {
+                    *task = true; // Atomically claim the task slot
+                    let mut stop = STOP_LIST_RUNNING.lock().unwrap();
+                    *stop = false; // Disable the stop, otherwise this thread will stop!
+                    break;
+                }
+            }
+            {
                 let mut stop = STOP_LIST_RUNNING.lock().unwrap(); // Tell the other thread to stop
                 *stop = true;
             }
             thread::sleep(std::time::Duration::from_millis(10)); // Sleep for a bit to not be CPU intensive
-        }
-        {
-            let mut task = LIST_TASK_RUNNING.lock().unwrap();
-            *task = true; // Tell other threads that a task is running
-            let mut stop = STOP_LIST_RUNNING.lock().unwrap();
-            *stop = false; // Disable the stop, otherwise this thread will stop!
         }
 
         clear_file_list(); // Only list the files on the current tab
@@ -574,10 +573,7 @@ pub fn extract_all(destination: PathBuf, yield_for_thread: bool, use_alias: bool
             // Get locale for localised status messages
             let locale = locale::get_locale(None);
 
-            // Extract music directory
-            extract_dir(destination.clone(), Category::Music, true, use_alias);
-
-            // Extract http directory
+            // Extract all categories (Category::All includes Music)
             extract_dir(destination.clone(), Category::All, true, use_alias);
 
             {
