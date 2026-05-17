@@ -127,18 +127,26 @@ pub fn detect_directory() -> PathBuf {
             .unwrap();
 
         if yes {
-            let option_path = native_dialog::DialogBuilder::file()
+            let option_path = match native_dialog::DialogBuilder::file()
                 .open_single_dir()
                 .show()
-                .unwrap();
+            {
+                Ok(path) => path,
+                Err(e) => {
+                    log_error!("Directory dialog failed: {e}");
+                    return PathBuf::new();
+                }
+            };
             if let Some(path) = option_path {
-                config::set_config_value(
-                    "cache_directory",
-                    validate_directory(path.to_string_lossy().as_ref())
-                        .unwrap()
-                        .into(),
-                );
-                return detect_directory();
+                match validate_directory(path.to_string_lossy().as_ref()) {
+                    Ok(valid) => {
+                        config::set_config_value("cache_directory", valid.into());
+                        return detect_directory();
+                    }
+                    Err(e) => {
+                        log_error!("Invalid directory selected: {e}");
+                    }
+                }
             } else {
                 log_critical!("Directory detection failed! {}", errors);
             }
