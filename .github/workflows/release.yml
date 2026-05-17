@@ -130,12 +130,23 @@ jobs:
           fi
           echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
 
+      - name: Process release body
+        id: body
+        run: |
+          # GitHub workflow_dispatch textarea doesn't support real newlines.
+          # Users type literal \n which we convert to actual newlines here.
+          printf -v RAW '%s' '${{ inputs.release_body }}'
+          PROCESSED="${RAW//\\n/$'\n'}"
+          echo "text<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$PROCESSED" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ inputs.version }}
           name: ${{ steps.title.outputs.title }}
-          body: ${{ inputs.release_body }}
+          body: ${{ steps.body.outputs.text }}
           draft: false
           prerelease: false
           generate_release_notes: false
