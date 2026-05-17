@@ -16,7 +16,14 @@ fn detect_config_file() -> PathBuf {
     if let Some(config_path) = get_system_config_string("config-path") {
         PathBuf::from(logic::resolve_path(&config_path))
     } else {
-        DEFAULT_CONFIG_FILE.into()
+        // Resolve relative to the executable's directory, not CWD
+        match std::env::current_exe() {
+            Ok(exe_path) => exe_path
+                .parent()
+                .unwrap_or(&exe_path)
+                .join(DEFAULT_CONFIG_FILE),
+            Err(_) => PathBuf::from(DEFAULT_CONFIG_FILE),
+        }
     }
 }
 
