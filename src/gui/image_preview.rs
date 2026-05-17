@@ -24,16 +24,49 @@ const KTX2_MAGIC: [u8; 12] = [
     0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
 ];
 
-// GL/Vulkan format constants
+// GL compressed format constants (used by KTX1)
 const GL_COMPRESSED_RGB_S3TC_DXT1_EXT: u32 = 0x83F0;
 const GL_COMPRESSED_RGBA_S3TC_DXT1_EXT: u32 = 0x83F1;
 const GL_COMPRESSED_RGBA_S3TC_DXT3_EXT: u32 = 0x83F2;
 const GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: u32 = 0x83F3;
-const VK_FORMAT_BC1_RGB_UNORM_BLOCK: u32 = 0x83F1;
-const VK_FORMAT_BC1_RGB_SRGB_BLOCK: u32 = 0x83F2;
-const VK_FORMAT_BC1_RGBA_UNORM_BLOCK: u32 = 0x83F0;
-const VK_FORMAT_BC7_RGBA_UNORM_BLOCK: u32 = 0x9274;
-const VK_FORMAT_BC7_RGBA_SRGB_BLOCK: u32 = 0x9278;
+const GL_COMPRESSED_SRGB_S3TC_DXT1_EXT: u32 = 0x8C4C;
+const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT: u32 = 0x8C4D;
+const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: u32 = 0x8C4E;
+const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: u32 = 0x8C4F;
+const GL_COMPRESSED_RGBA_BPTC_UNORM_EXT: u32 = 0x8E8C;
+const GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT: u32 = 0x8E8D;
+
+// Vulkan format constants (used by KTX2)
+const VK_FORMAT_BC1_RGB_UNORM_BLOCK: u32 = 131;
+const VK_FORMAT_BC1_RGB_SRGB_BLOCK: u32 = 132;
+const VK_FORMAT_BC1_RGBA_UNORM_BLOCK: u32 = 133;
+const VK_FORMAT_BC3_UNORM_BLOCK: u32 = 137;
+const VK_FORMAT_BC3_SRGB_BLOCK: u32 = 138;
+const VK_FORMAT_BC7_UNORM_BLOCK: u32 = 145;
+const VK_FORMAT_BC7_SRGB_BLOCK: u32 = 146;
+
+/// Convert a single linear (UNORM) byte value to sRGB.
+/// egui operates in gamma/sRGB space, so linear decompressed values
+/// must be converted before display to avoid yellow color shift.
+fn linear_to_srgb(linear: u8) -> u8 {
+    let l = linear as f32 / 255.0;
+    let s = if l <= 0.0031308 {
+        12.92 * l
+    } else {
+        1.055 * l.powf(1.0 / 2.4) - 0.055
+    };
+    (s * 255.0).round().clamp(0.0, 255.0) as u8
+}
+
+/// Apply linear-to-sRGB conversion to RGB channels of an RGBA8 pixel buffer.
+/// Alpha is left unchanged (alpha is always linear).
+fn apply_srgb_correction(rgba8: &mut [u8]) {
+    for chunk in rgba8.chunks_exact_mut(4) {
+        chunk[0] = linear_to_srgb(chunk[0]);
+        chunk[1] = linear_to_srgb(chunk[1]);
+        chunk[2] = linear_to_srgb(chunk[2]);
+    }
+}
 
 fn read_u32_le(data: &[u8], offset: usize) -> Option<u32> {
     data.get(offset..offset + 4)
@@ -145,19 +178,50 @@ fn decode_ktx1(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
         .get(mip_offset + 4..mip_offset + 4 + image_size)
         .ok_or("KTX1: truncated mip level")?;
 
-    match gl_internal_format {
+    let is_srgb;
+    let mut rgba8 = match gl_internal_format {
+        // BC1 (DXT1) — UNORM (linear data, needs sRGB correction)
         GL_COMPRESSED_RGB_S3TC_DXT1_EXT | GL_COMPRESSED_RGBA_S3TC_DXT1_EXT => {
-            bc1_decode_rgba8(pixel_data, width, height)
+            is_srgb = false;
+            bc1_decode_rgba8(pixel_data, width, height)?.2
         }
-        GL_COMPRESSED_RGBA_S3TC_DXT3_EXT => bc3_decode_rgba8(pixel_data, width, height),
-        GL_COMPRESSED_RGBA_S3TC_DXT5_EXT => bc3_decode_rgba8(pixel_data, width, height),
-        VK_FORMAT_BC7_RGBA_UNORM_BLOCK | VK_FORMAT_BC7_RGBA_SRGB_BLOCK => {
-            bc7_decode_rgba8(pixel_data, width, height)
+        // BC1 (DXT1) — sRGB (already in display color space)
+        GL_COMPRESSED_SRGB_S3TC_DXT1_EXT | GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT => {
+            is_srgb = true;
+            bc1_decode_rgba8(pixel_data, width, height)?.2
         }
-        _ => Err(format!(
-            "KTX1: unsupported format 0x{gl_internal_format:04X}"
-        )),
+        // BC3 (DXT3/DXT5) — UNORM (linear)
+        GL_COMPRESSED_RGBA_S3TC_DXT3_EXT | GL_COMPRESSED_RGBA_S3TC_DXT5_EXT => {
+            is_srgb = false;
+            bc3_decode_rgba8(pixel_data, width, height)?.2
+        }
+        // BC3 (DXT3/DXT5) — sRGB
+        GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT | GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT => {
+            is_srgb = true;
+            bc3_decode_rgba8(pixel_data, width, height)?.2
+        }
+        // BC7 — UNORM (linear)
+        GL_COMPRESSED_RGBA_BPTC_UNORM_EXT => {
+            is_srgb = false;
+            bc7_decode_rgba8(pixel_data, width, height)?.2
+        }
+        // BC7 — sRGB
+        GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT => {
+            is_srgb = true;
+            bc7_decode_rgba8(pixel_data, width, height)?.2
+        }
+        _ => {
+            return Err(format!(
+                "KTX1: unsupported format 0x{gl_internal_format:04X}"
+            ));
+        }
+    };
+
+    if !is_srgb {
+        apply_srgb_correction(&mut rgba8);
     }
+
+    Ok((width as u32, height as u32, rgba8))
 }
 
 fn decode_ktx2(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
@@ -190,17 +254,50 @@ fn decode_ktx2(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
         .as_ref()
         .map(|f| f.value())
         .unwrap_or(0);
-    match format_value {
-        VK_FORMAT_BC1_RGB_UNORM_BLOCK
-        | VK_FORMAT_BC1_RGB_SRGB_BLOCK
-        | VK_FORMAT_BC1_RGBA_UNORM_BLOCK => bc1_decode_rgba8(&level_bytes, width, height),
-        VK_FORMAT_BC7_RGBA_UNORM_BLOCK | VK_FORMAT_BC7_RGBA_SRGB_BLOCK => {
-            bc7_decode_rgba8(&level_bytes, width, height)
+    let is_srgb;
+    let mut rgba8 = match format_value {
+        // BC1 — UNORM (linear)
+        VK_FORMAT_BC1_RGB_UNORM_BLOCK | VK_FORMAT_BC1_RGBA_UNORM_BLOCK => {
+            is_srgb = false;
+            bc1_decode_rgba8(&level_bytes, width, height)?.2
         }
-        _ => Err(format!(
-            "KTX2: unsupported VkFormat 0x{format_value:04X}"
-        )),
+        // BC1 — sRGB
+        VK_FORMAT_BC1_RGB_SRGB_BLOCK => {
+            is_srgb = true;
+            bc1_decode_rgba8(&level_bytes, width, height)?.2
+        }
+        // BC3 — UNORM (linear)
+        VK_FORMAT_BC3_UNORM_BLOCK => {
+            is_srgb = false;
+            bc3_decode_rgba8(&level_bytes, width, height)?.2
+        }
+        // BC3 — sRGB
+        VK_FORMAT_BC3_SRGB_BLOCK => {
+            is_srgb = true;
+            bc3_decode_rgba8(&level_bytes, width, height)?.2
+        }
+        // BC7 — UNORM (linear)
+        VK_FORMAT_BC7_UNORM_BLOCK => {
+            is_srgb = false;
+            bc7_decode_rgba8(&level_bytes, width, height)?.2
+        }
+        // BC7 — sRGB
+        VK_FORMAT_BC7_SRGB_BLOCK => {
+            is_srgb = true;
+            bc7_decode_rgba8(&level_bytes, width, height)?.2
+        }
+        _ => {
+            return Err(format!(
+                "KTX2: unsupported VkFormat 0x{format_value:04X}"
+            ));
+        }
+    };
+
+    if !is_srgb {
+        apply_srgb_correction(&mut rgba8);
     }
+
+    Ok((width as u32, height as u32, rgba8))
 }
 
 /// Decode BC1 (DXT1) compressed data to RGBA8 pixels.
