@@ -5,7 +5,7 @@ use fluent_bundle::{FluentBundle, FluentResource};
 use native_dialog::DialogBuilder;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, OnceLock};
 use std::time::Duration;
 
 use std::collections::HashMap;
@@ -242,29 +242,35 @@ impl Default for MyApp {
     }
 }
 
-fn detect_japanese_font() -> Option<std::path::PathBuf> {
-    let font_dirs = [
-        "C:\\Windows\\Fonts\\msgothic.ttc",
-        "/usr/share/fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
-        "~/.local/share/fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
-        "~/.fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
-    ];
+static JAPANESE_FONT_PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
 
-    for font in font_dirs {
-        let resolved_font = PathBuf::from(logic::resolve_path(font));
-        match std::fs::metadata(&resolved_font) {
-            Ok(metadata) => {
-                if metadata.is_file() {
-                    log_info!("{}: valid", resolved_font.display());
-                    return Some(resolved_font);
+fn detect_japanese_font() -> Option<PathBuf> {
+    JAPANESE_FONT_PATH
+        .get_or_init(|| {
+            let font_dirs = [
+                "C:\\Windows\\Fonts\\msgothic.ttc",
+                "/usr/share/fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
+                "~/.local/share/fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
+                "~/.fonts/noto-cjk/NotoSerifCJK-Regular.ttc",
+            ];
+
+            for font in font_dirs {
+                let resolved_font = PathBuf::from(logic::resolve_path(font));
+                match std::fs::metadata(&resolved_font) {
+                    Ok(metadata) => {
+                        if metadata.is_file() {
+                            log_info!("{}: valid", resolved_font.display());
+                            return Some(resolved_font);
+                        }
+                    }
+                    Err(e) => {
+                        log_warn!("{}: invalid - {}", resolved_font.display(), e);
+                    }
                 }
             }
-            Err(e) => {
-                log_warn!("{}: invalid - {}", resolved_font.display(), e);
-            }
-        }
-    }
-    None
+            None
+        })
+        .clone()
 }
 
 // Some code in the function below is taken from this URL
