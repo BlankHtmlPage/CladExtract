@@ -35,6 +35,9 @@ const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: u32 = 0x8C4E;
 const GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: u32 = 0x8C4F;
 const GL_COMPRESSED_RGBA_BPTC_UNORM_EXT: u32 = 0x8E8C;
 const GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT: u32 = 0x8E8D;
+// Roblox uses non-standard GL values for BC7 in KTX1
+const GL_COMPRESSED_RGBA_BPTC_ROBLOX: u32 = 0x9274;
+const GL_COMPRESSED_SRGB_ALPHA_BPTC_ROBLOX: u32 = 0x9278;
 
 // Vulkan format constants (used by KTX2)
 const VK_FORMAT_BC1_RGB_UNORM_BLOCK: u32 = 131;
@@ -201,12 +204,12 @@ fn decode_ktx1(data: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
             bc3_decode_rgba8(pixel_data, width, height)?.2
         }
         // BC7 — UNORM (linear)
-        GL_COMPRESSED_RGBA_BPTC_UNORM_EXT => {
+        GL_COMPRESSED_RGBA_BPTC_UNORM_EXT | GL_COMPRESSED_RGBA_BPTC_ROBLOX => {
             is_srgb = false;
             bc7_decode_rgba8(pixel_data, width, height)?.2
         }
         // BC7 — sRGB
-        GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT => {
+        GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT | GL_COMPRESSED_SRGB_ALPHA_BPTC_ROBLOX => {
             is_srgb = true;
             bc7_decode_rgba8(pixel_data, width, height)?.2
         }
