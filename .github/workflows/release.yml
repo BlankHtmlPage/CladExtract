@@ -1,0 +1,144 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g. 1.0.0)"
+        required: true
+        type: string
+      release_name:
+        description: "Release name (e.g. CladExtract)"
+        required: true
+        type: string
+      codename:
+        description: "Codename (optional, e.g. 'Summer Update')"
+        required: false
+        type: string
+        default: ""
+      release_body:
+        description: "Release notes / changelog (Markdown supported)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  BINARY_NAME: CladExtract
+  RELEASE_TAG: ""
+
+jobs:
+  # ── Linux (amd64) ──────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: linux-cargo-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libglib2.0-dev libatk1.0-dev \
+            libgdk-pixbuf2.0-dev libpango1.0-dev \
+            libx11-dev libxcursor-dev libxrandr-dev \
+            libxinerama-dev libxi-dev libgl1-mesa-dev
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Rename binary
+        run: mv target/release/${{ env.BINARY_NAME }} target/release/${{ env.BINARY_NAME }}-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: target/release/${{ env.BINARY_NAME }}-linux-amd64
+          if-no-files-found: error
+
+  # ── Windows (amd64) ────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: windows-cargo-
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Rename binary
+        shell: pwsh
+        run: |
+          Rename-Item target/release/${{ env.BINARY_NAME }}.exe `
+            ${{ env.BINARY_NAME }}-windows-amd64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64
+          path: target/release/${{ env.BINARY_NAME }}-windows-amd64.exe
+          if-no-files-found: error
+
+  # ── Release ────────────────────────────────────────────────────
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Compute release title
+        id: title
+        run: |
+          NAME="${{ inputs.release_name }}"
+          VER="${{ inputs.version }}"
+          CODENAME="${{ inputs.codename }}"
+
+          TITLE="${NAME} v${VER}"
+          if [ -n "$CODENAME" ]; then
+            TITLE="${TITLE} — ${CODENAME}"
+          fi
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: ${{ steps.title.outputs.title }}
+          body: ${{ inputs.release_body }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          files: |
+            artifacts/linux-amd64/${{ env.BINARY_NAME }}-linux-amd64
+            artifacts/windows-amd64/${{ env.BINARY_NAME }}-windows-amd64.exe
